@@ -12,7 +12,11 @@ two sites in parallel with the same PAT makes them knock each other's sessions o
 For each site, steps run in order. If step 00 fails, the rest of that site is
 skipped and the runner moves on to the next site. If sign-in fails on two sites
 in a row, the runner stops (four consecutive failures lock the PAT). Each site writes to
-output/<site>/ and a per-site log to output/<site>/run.log.
+output/<site>/ and a per-site log to output/<site>/run.log, headed with the code version.
+
+Step 02b (import Traffic to Views) runs only when output/<site>/traffic-to-views/ has a
+CSV newer than the last import, or the last import predates the current format;
+otherwise it is reported as skipped.
 """
 
 import argparse
@@ -24,11 +28,13 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from lib.tableau_client import REPO_ROOT, configured_sites, ensure_env, normalize_site, site_folder  # noqa: E402
+from lib.tableau_client import (REPO_ROOT, code_version, configured_sites, ensure_env,  # noqa: E402
+                                normalize_site, site_folder)
 
 STEPS = {
     "00": "check_connectivity.py",
     "02": "fetch_view_usage.py",
+    "02b": "import_traffic_to_views.py",
     "03": "fetch_report_lineage.py",
     "03b": "fetch_workbook_connections.py",
     "10": "build_report_inventory.py",
@@ -46,7 +52,7 @@ def main():
     ap.add_argument("--source", default=None, help="passed to step 02 (auto|rest-snapshots|admin-insights)")
     ap.add_argument("--days", default=None, help="passed to step 02")
     args = ap.parse_args()
-    ensure_env()
+    ensure_env()  # also prints the code version
 
     sites = [normalize_site(s) for s in args.site]
     if args.all:
@@ -77,8 +83,16 @@ def main():
         print(f"\n######## site '{folder}' ########", flush=True)
         results = {}
         with open(out / "run.log", "a", encoding="utf-8") as logf:
-            logf.write(f"\n=== {datetime.now().isoformat(timespec='seconds')} steps {','.join(steps)}\n")
+            logf.write(f"\n=== {datetime.now().isoformat(timespec='seconds')} steps {','.join(steps)} "
+                       f"(tableau-assessment-py {code_version()})\n")
             for step in steps:
+                if step == "02b":
+                    why = traffic_import_skip_reason(out)
+                    if why:
+                        print(f"-- 02b skipped: {why}", flush=True)
+                        logf.write(f"--- 02b skipped: {why}\n")
+                        results[step] = "skip"
+                        continue
                 cmd = [sys.executable, str(HERE / STEPS[step]), "--site", site or "default"]
                 if step == "02":
                     cmd += ["--with-users"] if args.with_users else []
@@ -119,7 +133,26 @@ def main():
     if stopped:
         print("\nStopped signing in after 2 consecutive failures to protect the PAT. "
               "Run `python scripts/check_connectivity.py --all-sites --roles-only` to see which sites refuse it.")
-    sys.exit(1 if any(v != "ok" for r in summary.values() for v in r.values()) else 0)
+    sys.exit(1 if any(v not in ("ok", "skip") for r in summary.values() for v in r.values()) else 0)
+
+
+def traffic_import_skip_reason(out):
+    """None if step 02b should run for this site, else why it is skipped."""
+    csvs = list((out / "traffic-to-views").glob("*.csv")) if (out / "traffic-to-views").exists() else []
+    if not csvs:
+        return "no Traffic to Views export in traffic-to-views/"
+    done = out / "traffic-usage.json"
+    if not done.exists():
+        return None
+    try:
+        fmt = json.loads(done.read_text(encoding="utf-8")).get("window", {}).get("format", 1)
+    except ValueError:
+        return None
+    if fmt < 2:
+        return None
+    if max(p.stat().st_mtime for p in csvs) > done.stat().st_mtime:
+        return None
+    return "already imported (no newer export)"
 
 
 if __name__ == "__main__":

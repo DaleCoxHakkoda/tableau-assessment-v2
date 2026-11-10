@@ -48,6 +48,14 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
+def code_version():
+    """The repo version from the VERSION file at the repo root ('unknown' if missing)."""
+    try:
+        return (REPO_ROOT / "VERSION").read_text(encoding="utf-8").strip() or "unknown"
+    except OSError:
+        return "unknown"
+
+
 def log(msg):
     print(msg, file=sys.stderr, flush=True)
 
@@ -81,8 +89,7 @@ def ensure_env():
     global _ENV_LOADED
     if not _ENV_LOADED:
         p = load_dotenv()
-        if p:
-            log(f"Loaded config from {p}")
+        log(f"tableau-assessment-py {code_version()}" + (f"; loaded config from {p}" if p else "; no .env found"))
         _ENV_LOADED = True
 
 

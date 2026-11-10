@@ -147,6 +147,7 @@ def usage_from_snapshots(snaps):
             rec["lifetime_avg_views_per_30d"] = round(rec["lifetime_views"] / age * 30, 2)
         if len(series) >= 2:
             accesses, active, observed, reset, last_active = 0, 0, 0, False, None
+            active_keys = []
             for (t1, c1), (t2, c2) in zip(series, series[1:]):
                 d = c2 - c1
                 if d < 0:
@@ -157,6 +158,7 @@ def usage_from_snapshots(snaps):
                 if d > 0:
                     active += 1
                     last_active = (t1, t2)
+                    active_keys.append(t2.strftime(SNAP_FMT))
             rec.update({
                 "accesses": accesses,
                 "tracked_days": round((series[-1][0] - series[0][0]).total_seconds() / 86400, 1),
@@ -165,6 +167,7 @@ def usage_from_snapshots(snaps):
                 "last_active_between": f"{day(last_active[0].isoformat())}..{day(last_active[1].isoformat())}"
                 if last_active else None,
                 "counter_reset": reset,
+                "active_interval_keys": active_keys,
             })
         out[vid] = rec
     meta = {"first_snapshot": first_ts.isoformat(), "latest_snapshot": latest_ts.isoformat(),
@@ -279,7 +282,7 @@ def main():
         days = args.days or int(cfg("USAGE_DAYS", site, "90"))
         views, meta, users = from_admin_insights(site, days, not args.no_weekly, args.with_users, errors)
 
-    meta.update({"computed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    meta.update({"format": 2, "computed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                  "site": site_folder(site), "source": source, "errors": errors})
     (out / "view-usage.json").write_text(json.dumps({"window": meta, "views": views}, indent=2, default=str))
 

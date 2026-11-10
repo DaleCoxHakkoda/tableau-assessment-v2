@@ -233,13 +233,16 @@ def main():
         top = v["users"].most_common(5)
         out_views[luid] = {
             "view_luid": luid, "match": v["how"], "accesses": v["accesses"], "users": len(v["users"]),
+            # Kept so step 10 can combine a dashboard with its member sheets without double counting.
+            "user_counts": {k: [v["labels"].get(k, k), n] for k, n in v["users"].items()},
+            "week_keys": sorted(v["weeks"]),
             "first_accessed": v["first"].date().isoformat(), "last_accessed": v["last"].date().isoformat(),
             "days_since_last_access": (today - v["last"]).days,
             "active_weeks": len(v["weeks"]), "active_week_pct": round(100 * len(v["weeks"]) / span_weeks),
             "months": dict(sorted(v["months"].items())),
             "top_users": "; ".join(f"{v['labels'].get(k, k)} ({n})" for k, n in top),
         }
-    meta = {"imported_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "site": site_folder(site),
+    meta = {"format": 2, "imported_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "site": site_folder(site),
             "files": [f.name for f in files], "window_start": start.date().isoformat(),
             "window_end": end.date().isoformat(), "window_days": (end - start).days + 1,
             "window_weeks": span_weeks, "events": sum(e[5] for e in events),

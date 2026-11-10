@@ -125,7 +125,7 @@ and appends each site's output to `output/<site>/run.log`.
 | 00 | `check_connectivity.py` | ready | Tableau | `connectivity.json`, `_server/sites.json` |
 | 01 | `fetch_inventory.py` | **new** (Server: port `inventory-rest.rb` and add REST users, groups, extract tasks and jobs; Cloud: the skill's Admin Insights recipes) | Tableau | `inventory.json`, `users.json`-input files |
 | 02 | `fetch_view_usage.py` | ready | REST snapshots (Server) / Admin Insights (Cloud) | `usage-snapshots/`, `view-usage.json`, `view-usage.csv`, `raw-ts-events-per-view.json` |
-| 02b | `import_traffic_to_views.py` | ready (one-time per site) | `traffic-to-views/*.csv` (manual export) | `traffic-usage.json`, `.csv`, `traffic-unmatched.csv` |
+| 02b | `import_traffic_to_views.py` | ready; the runner runs it when a new export is present | `traffic-to-views/*.csv` (manual export) | `traffic-usage.json`, `.csv`, `traffic-unmatched.csv` |
 | 03 | `fetch_report_lineage.py` | ready | Metadata API | `report-lineage-raw.json` |
 | 03b | `fetch_workbook_connections.py` | ready | REST connections | `workbook-connections.json` |
 | 04 | `fetch_all_twbs.py` | port `fetch-all-twbs.rb` | REST | `twbs/<luid>.twb`, `twb-fetch-results.json` |
@@ -215,6 +215,7 @@ All in `output/<site>/report-inventory/`:
 | `edges_report_datasource.csv` | report × datasource | Graph edges. Embedded datasources that proxy a published one carry its LUID. |
 | `edges_datasource_table.csv` | datasource × table | Graph edges, with `via` = `direct`, `custom_sql:tableau` or `custom_sql:regex`. |
 | `custom_sql.csv` | one row per custom SQL block | Tables parsed by Tableau where it can, regex FROM/JOIN extraction where it cannot, `unparsed` for manual review. |
+| `summary.csv` | one row per metric | The run's headline numbers (inventory, datasources, lineage status, source types and hosts, snapshot and traffic usage, including the count of candidates to retire) as `site, section, metric, value, description`. Paste or import into a workbook. |
 | `lineage-graph.json` | nodes + edges | Load into a graph tool or stitch to the pipeline DAG. |
 
 `lineage_status` in `reports.csv` says why a report has, or lacks, table lineage:
@@ -249,15 +250,59 @@ datasources (extract with no connection info, proxy to an unresolved published d
 the Parameters pseudo-datasource, dashboards with no member sheets, and so on), prints
 counts with examples, and writes `report-inventory/lineage-diagnosis.csv`.
 
-Key usage columns in `reports.csv`:
+### Usage columns: which to read
 
-- `usage_source`, `usage_window_days`: where the numbers came from and over what period.
-- The snapshot columns described above (Server), or `view_actors`, `view_last_accessed`,
-  `view_active_weeks` and `view_top_users` (Cloud, Admin Insights).
-- `usage_join`: `luid`, `name` (fallback on workbook + view name), `not-in-snapshot` (view
-  created after the latest snapshot), or `no-events` (Cloud: zero accesses in the window).
+`reports.csv` carries only the usage columns your deployment can fill. On Tableau Server:
+
+| Question | History (Traffic to Views, ~6 months back) | Ongoing (weekly snapshots, from the first run) |
+|---|---|---|
+| How often was it opened? | `traffic_accesses` | `view_accesses` |
+| By how many people? | `traffic_users` | (not available from snapshots) |
+| When was it last opened? | `traffic_last_accessed`, `traffic_days_since_access` | `view_last_active_between` |
+| How regularly? | `traffic_active_weeks`, `traffic_active_week_pct` | `view_active_intervals` of `view_intervals`, `view_active_interval_pct` |
+| Who uses it? | `traffic_top_users` | (not available from snapshots) |
+| Lifetime | | `view_lifetime_views`, `view_lifetime_avg_per_30d` |
+
+The two sources cover different windows (history ends at the export date; snapshots start
+at the first run), so their numbers are not expected to match. On Tableau Cloud the
+snapshot columns are replaced by `view_actors`, `view_last_accessed`, `view_active_weeks`
+and `view_top_users` from Admin Insights.
+
+**Dashboards include their sheets.** A visible sheet inside a dashboard can be opened on
+its own tab, and those opens count against the sheet. A dashboard's usage therefore adds
+its member sheets' usage, counting each user and each week once; `usage_member_views` says
+how many member views were added.
+
+Other usage columns: `usage_source`, `usage_window_days` (where the snapshot numbers came
+from and over what period) and `usage_join` (`luid`; `name`, a fallback on workbook + view
+name; `members-only`, a dashboard whose usage comes only from its sheets; `not-in-snapshot`,
+a view created after the latest snapshot; `no-events`, Cloud with zero accesses).
+
+### Candidates to retire
+
+`retire_candidate` and `retire_reason` flag reports for owner review. They are candidates,
+not decisions: a report becomes retired only after its owner confirms.
+
+| `retire_candidate` | Rule |
+|---|---|
+| `yes` | Not opened in the Traffic to Views window, nor in the snapshot window if there is one. Without Traffic to Views, not opened in a snapshot window of at least 28 days (`RETIRE_MIN_WINDOW_DAYS`). |
+| `review` | Not opened, but created inside the window, so too new to judge. |
+| `no` | Opened in either window. The reason says how often and where. |
+| `unknown` | Not enough windowed usage yet. |
+| `n/a` | No-datasource pages (cover, glossary); they migrate with their workbook. |
+
+`retire_reason` states the window, e.g. "not opened 2026-04-30..2026-10-30 (Traffic to
+Views) or 2026-10-30..2026-11-10 (usage snapshots); pending owner confirmation", so the
+criteria travel with the flag. Annual reports (year-end, regulatory) can look unused in
+a six-month window: confirm with the `owner` before acting. `summary.csv` counts each
+value under the `retire` section.
 
 ### Combining sites
+
+Step 10 also rebuilds two cross-site files in `output/_server/` from every site folder's
+`summary.csv`: `summary-all-sites.csv` (all rows stacked, for import or pivot tables) and
+`summary-all-sites-wide.csv` (one row per metric, one column per site, for copy-paste).
+Each site's numbers are as of its own last step 10 run; the `generated_at` row shows when.
 
 Each site's outputs are self-contained. Table keys are identical across sites, so
 concatenating `tables.csv` from every site and grouping by `table_key` shows which
@@ -327,10 +372,18 @@ Planned as step 13 (`sequence_migration.py`) once the pipeline DAG exists:
 - **Sensitive output.** `output/` holds owner and user emails, custom SQL text and activity
   data. It is git-ignored; keep it that way.
 
+## Versions
+
+The repo version is in `VERSION` at the root. Every script prints it on its first line
+(`tableau-assessment-py 2026.11.10; loaded config from ...`), `run.log` records it on each
+run's header line, and `summary.csv` carries it as `code_version`, so any output can be
+traced to the code that produced it. Bump `VERSION` with each change.
+
 ## Layout
 
 ```
 .env.example
+VERSION                        repo version, printed by every script
 scripts/
   lib/tableau_client.py        .env + per-site config, PAT sign-in, REST, GraphQL, VizQL Data Service
   lib/usage_queries.py         Admin Insights queries (Cloud only)

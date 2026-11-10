@@ -22,6 +22,12 @@ Outputs (in --out/report-inventory/):
     tables.csv                    one row per warehouse table with fan-in counts
     custom_sql.csv                every custom SQL block, parsed tables, parse confidence
     lineage-graph.json            nodes + edges; table nodes keyed DB.SCHEMA.TABLE for joining to pipeline DAGs
+    summary.csv                   the run's headline numbers, one metric per row (site, section, metric,
+                                  value, description); paste or import into a workbook
+
+Also rebuilds, across every site folder next to this one (output/_server/):
+    summary-all-sites.csv         every site's summary.csv stacked (long format, for import / pivots)
+    summary-all-sites-wide.csv    one row per metric, one column per site (for copy-paste)
 
 "Report" = a dashboard, or a visible worksheet not contained in any dashboard.
 Sheets that only exist inside dashboards roll up into the dashboard. Hidden
@@ -33,11 +39,12 @@ import csv
 import json
 import re
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from lib.tableau_client import add_site_args, resolve_site_args  # noqa: E402
+from lib.tableau_client import add_site_args, cfg, code_version, resolve_site_args  # noqa: E402
 
 
 def log(msg):
@@ -136,18 +143,111 @@ def regex_tables(sql):
     return uniq(t for t in found if t and not t.startswith("(") and t not in SQL_KW and t not in ctes)
 
 
-def traffic_cols(traffic, luid, window, present):
-    t = traffic.get(luid) if luid else None
+# Usage columns that exist only for one usage source; dropped from the CSVs for the other.
+CLOUD_ONLY_COLS = ["view_actors", "view_last_accessed", "view_days_since_access", "view_active_weeks",
+                   "view_active_week_pct", "view_top_users"]
+SNAPSHOT_ONLY_COLS = ["view_tracked_days", "view_active_intervals", "view_intervals", "view_active_interval_pct",
+                      "view_last_active_between", "view_lifetime_views", "view_lifetime_avg_per_30d",
+                      "view_created_at", "view_counter_reset"]
+
+
+def _sum(recs, k):
+    vals = [r.get(k) for r in recs if r.get(k) is not None]
+    return sum(vals) if vals else None
+
+
+def _minmax(recs, k, fn):
+    vals = [r.get(k) for r in recs if r.get(k) is not None and r.get(k) != ""]
+    return fn(vals) if vals else None
+
+
+def combine_view_usage(recs, source):
+    """Usage for a report: its own view plus any member sheets opened on their own tab."""
+    if len(recs) == 1:
+        return dict(recs[0])
+    out = {"accesses": _sum(recs, "accesses")}
+    if source == "admin-insights":
+        # Event-level detail is not kept for Cloud; distinct users and weeks are lower bounds.
+        top = max(recs, key=lambda r: r.get("accesses") or 0)
+        out.update({"actors": _minmax(recs, "actors", max), "first_accessed": _minmax(recs, "first_accessed", min),
+                    "last_accessed": _minmax(recs, "last_accessed", max),
+                    "days_since_last_access": _minmax(recs, "days_since_last_access", min),
+                    "active_weeks": _minmax(recs, "active_weeks", max),
+                    "active_week_pct": _minmax(recs, "active_week_pct", max), "top_users": top.get("top_users")})
+        return out
+    with_iv = [r for r in recs if r.get("intervals") is not None]
+    intervals = _minmax(recs, "intervals", max)
+    if with_iv and all(r.get("active_interval_keys") is not None for r in with_iv):
+        active = len(set().union(*(set(r["active_interval_keys"]) for r in with_iv)))
+    else:
+        active = _minmax(recs, "active_intervals", max)  # older view-usage.json: lower bound
+    rate = _sum(recs, "lifetime_avg_views_per_30d")
+    out.update({"lifetime_views": _sum(recs, "lifetime_views"),
+                "lifetime_avg_views_per_30d": round(rate, 2) if rate is not None else None,
+                "tracked_days": _minmax(recs, "tracked_days", max), "intervals": intervals,
+                "active_intervals": active,
+                "active_interval_pct": round(100 * active / intervals) if active is not None and intervals else None,
+                "last_active_between": _minmax(recs, "last_active_between", max),
+                "created_at": recs[0].get("created_at"),
+                "counter_reset": any(r.get("counter_reset") for r in recs) if with_iv else None})
+    return out
+
+
+def traffic_cols(traffic, luids, window, window_weeks, present):
+    """Traffic to Views history for a report's own view plus its member sheets' views."""
     if not present:
         return {}
-    if t is None:
+    recs = [traffic[l] for l in luids if l and l in traffic]
+    if not recs:
         # In the export window with no access events (the export lists every access).
-        return {"traffic_window": window, "traffic_accesses": 0, "traffic_users": 0}
-    return {"traffic_window": window, "traffic_accesses": t["accesses"], "traffic_users": t["users"],
-            "traffic_first_accessed": t["first_accessed"], "traffic_last_accessed": t["last_accessed"],
-            "traffic_days_since_access": t["days_since_last_access"],
-            "traffic_active_weeks": t["active_weeks"], "traffic_active_week_pct": t["active_week_pct"],
-            "traffic_top_users": t["top_users"]}
+        return {"traffic_window": window, "traffic_accesses": 0, "traffic_users": 0,
+                "traffic_active_weeks": 0, "traffic_active_week_pct": 0}
+    if all("user_counts" in r for r in recs):
+        users, labels = defaultdict(int), {}
+        for r in recs:
+            for k, (label, n) in r["user_counts"].items():
+                users[k] += n
+                labels[k] = label
+        n_users = len(users)
+        top = "; ".join(f"{labels[k]} ({n})" for k, n in sorted(users.items(), key=lambda x: -x[1])[:5])
+        n_weeks = len(set().union(*(set(r.get("week_keys") or []) for r in recs)))
+    else:  # older traffic-usage.json without detail: lower bounds
+        n_users = max(r["users"] for r in recs)
+        top = max(recs, key=lambda r: r["accesses"])["top_users"]
+        n_weeks = max(r["active_weeks"] for r in recs)
+    return {"traffic_window": window, "traffic_accesses": sum(r["accesses"] for r in recs), "traffic_users": n_users,
+            "traffic_first_accessed": min(r["first_accessed"] for r in recs),
+            "traffic_last_accessed": max(r["last_accessed"] for r in recs),
+            "traffic_days_since_access": min(r["days_since_last_access"] for r in recs),
+            "traffic_active_weeks": n_weeks,
+            "traffic_active_week_pct": round(100 * n_weeks / window_weeks) if window_weeks else None,
+            "traffic_top_users": top}
+
+
+def retire_assessment(r, traffic_window, traffic_start, snap_window, snap_days, min_days):
+    """(retire_candidate, retire_reason). Candidates only; owners confirm before anything is retired."""
+    if r["lineage_status"] == "no-datasource":
+        return "n/a", "no-datasource page (cover, glossary, parameters): migrates with its workbook"
+    t = r.get("traffic_accesses")
+    s = r.get("view_accesses") if snap_window else None
+    if t:
+        return "no", f"opened {t} times in {traffic_window} (Traffic to Views)"
+    if s:
+        return "no", f"opened {s} times in {snap_window} (usage snapshots)"
+    created = r.get("view_created_at")
+    if t is not None:  # Traffic to Views present, 0 opens
+        if created and traffic_start and created > traffic_start:
+            return "review", f"not opened since it was created on {created}, inside the {traffic_window} window"
+        why = f"not opened {traffic_window} (Traffic to Views)"
+        if s == 0:
+            why += f" or {snap_window} (usage snapshots)"
+        return "yes", why + "; pending owner confirmation"
+    if s == 0 and snap_days is not None:
+        if snap_days < min_days:
+            return "unknown", (f"not opened in {snap_window}, but that is only {snap_days} days "
+                               f"(minimum {min_days}); import Traffic to Views or keep snapshotting")
+        return "yes", f"not opened {snap_window} (usage snapshots); pending owner confirmation"
+    return "unknown", "no windowed usage yet"
 
 
 # ---------------------------------------------------------------- main
@@ -169,6 +269,7 @@ def main():
     tu = load_json(out_dir, "traffic-usage.json")
     traffic = (tu or {}).get("views") or {}
     traffic_window = (f"{dig(tu, 'window', 'window_start')}..{dig(tu, 'window', 'window_end')}" if tu else None)
+    traffic_weeks = dig(tu, "window", "window_weeks")
     vu = load_json(out_dir, "view-usage.json")
     view_usage = (vu or {}).get("views") or {}
     usage_days = dig(vu, "window", "usage_days")
@@ -368,9 +469,18 @@ def main():
                     "datasource_id": d, "datasource_name": r.get("name"), "datasource_kind": r.get("kind"),
                     "published_luids": ";".join(x for x in luids if x),
                 })
+            # A dashboard's visible member sheets can also be opened on their own tab; those
+            # opens count against the sheet's view, so they are added to the dashboard's usage.
+            member_luids = (uniq(m.get("luid") for m in members if m.get("luid") and m.get("luid") != luid)
+                            if rtype == "dashboard" else [])
             usage, join = view_usage.get(luid), "luid"
             if usage is None:
                 usage, join = view_by_name.get(((wb.get("name") or "").upper(), (name or "").upper())), "name"
+            member_recs = [view_usage[l] for l in member_luids if l in view_usage]
+            if member_recs:
+                if usage is None:
+                    join = "members-only"
+                usage = combine_view_usage(([usage] if usage else []) + member_recs, usage_source)
             if usage is None:
                 if not vu:
                     usage, join = {}, None
@@ -410,7 +520,8 @@ def main():
                 "view_last_active_between": usage.get("last_active_between"),
                 "view_lifetime_views": usage.get("lifetime_views"), "view_lifetime_avg_per_30d": usage.get("lifetime_avg_views_per_30d", usage.get("views_per_30d")),
                 "view_created_at": usage.get("created_at"), "view_counter_reset": usage.get("counter_reset"),
-                **traffic_cols(traffic, luid, traffic_window, bool(tu)),
+                "usage_member_views": len(member_recs) if vu else None,
+                **traffic_cols(traffic, [luid] + member_luids, traffic_window, traffic_weeks, bool(tu)),
             })
 
         for db in wb.get("dashboards") or []:
@@ -463,6 +574,33 @@ def main():
                            "read_by_prep_flows": "; ".join(uniq(flow_reads[t["table_key"]]))})
     table_rows.sort(key=lambda t: (-t["n_reports"], t["table_key"]))
 
+    # ---- retire candidates (candidates only: owners confirm before anything is retired)
+    snap_window = snap_days = None
+    vw = (vu or {}).get("window") or {}
+    if vu and vw.get("usage_days") not in (None, "lifetime"):
+        snap_days = vw["usage_days"]
+        if usage_source == "admin-insights":
+            snap_window = f"{vw.get('min_date')}..{str(vw.get('computed_at'))[:10]}"
+        else:
+            snap_window = f"{str(vw.get('first_snapshot'))[:10]}..{str(vw.get('latest_snapshot'))[:10]}"
+    min_days = float(cfg("RETIRE_MIN_WINDOW_DAYS", None, "28"))
+    traffic_start = dig(tu, "window", "window_start")
+    for r in reports:
+        r["retire_candidate"], r["retire_reason"] = retire_assessment(
+            r, traffic_window, traffic_start, snap_window, snap_days, int(min_days) if min_days.is_integer() else min_days)
+
+    # ---- columns that cannot have values for this deployment are left out
+    drop = set()
+    if usage_source == "rest-snapshots":
+        drop |= set(CLOUD_ONLY_COLS)
+    elif usage_source == "admin-insights":
+        drop |= set(SNAPSHOT_ONLY_COLS)
+    else:
+        drop |= set(CLOUD_ONLY_COLS) | set(SNAPSHOT_ONLY_COLS) | {"usage_member_views"}
+    if not shortlist and not plan:  # filled by future ports (shortlist, migration plan)
+        drop |= {"wb_accesses", "wb_actors", "wb_tag", "wb_score", "wb_predicted_parity",
+                 "wb_recommended_path", "wb_dm_cluster"}
+
     # ---- write
     def fmt(v):
         if v is None:
@@ -480,8 +618,11 @@ def main():
             for r in rows:
                 w.writerow([fmt(r.get(c)) for c in cols])
 
-    write_csv("reports.csv", reports)
-    write_csv("unpublished_dashboards.csv", unpublished)
+    def report_cols(rows):
+        return [c for c in uniq(k for r in rows for k in r) if c not in drop]
+
+    write_csv("reports.csv", reports, report_cols(reports))
+    write_csv("unpublished_dashboards.csv", unpublished, report_cols(unpublished))
     write_csv("edges_report_datasource.csv", edges_rep_ds)
     write_csv("edges_datasource_table.csv", ds_tables_rows)
     write_csv("tables.csv", table_rows,
@@ -545,13 +686,140 @@ def main():
     for k in LINEAGE_STATUS_HELP:
         if counts.get(k):
             log(f"  lineage_status {k:<20} {counts[k]:>6}  {LINEAGE_STATUS_HELP[k]}")
+    rc = Counter(r.get("retire_candidate") for r in reports)
+    log(f"retire candidates (pending owner confirmation): {rc.get('yes', 0)}; review (new): {rc.get('review', 0)}; "
+        f"keep: {rc.get('no', 0)}; unknown: {rc.get('unknown', 0)}; n/a (no-datasource pages): {rc.get('n/a', 0)}")
     if vu:
         joins = [r["usage_join"] for r in reports]
         log(f"view usage ({usage_source}, window {usage_days}): {joins.count('luid')} by LUID, {joins.count('name')} by name, "
             f"{joins.count('no-events')} with no access events, {joins.count('not-in-snapshot')} not in snapshot")
     if raw.get("errors"):
         log(f"fetch errors: {', '.join(raw['errors'])}")
+    write_summary(Path(out_dir), dest, reports, unpublished, datasources, custom_sql, restricted, filled,
+                  bool(wc), tu, vu, raw)
     log(f"Wrote {dest}/")
+
+
+def write_summary(out_dir, dest, reports, unpublished, datasources, custom_sql, restricted, filled,
+                  had_wc, tu, vu, raw):
+    site = out_dir.name
+    rows = []
+
+    def add(section, metric, value, desc=""):
+        rows.append({"site": site, "section": section, "metric": metric,
+                     "value": "" if value is None else value, "description": desc})
+
+    conn = load_json(out_dir, "connectivity.json") or {}
+    add("site", "generated_at", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"), "when step 10 ran")
+    add("site", "site_role", conn.get("site_role"), "PAT owner's role (full visibility needs Site Administrator)")
+    add("site", "code_version", code_version(), "tableau-assessment-py version that produced these numbers")
+
+    data = [r for r in reports if r["lineage_status"] != "no-datasource"]
+    add("inventory", "workbooks", len({r["workbook_luid"] for r in reports}), "workbooks with at least one report")
+    add("inventory", "reports", len(reports), "dashboards + standalone visible sheets")
+    add("inventory", "dashboards", sum(r["report_type"] == "dashboard" for r in reports))
+    add("inventory", "standalone_sheets", sum(r["report_type"] == "sheet" for r in reports))
+    add("inventory", "data_bearing_reports", len(data), "reports that use a datasource (the migration units)")
+    add("inventory", "no_datasource_pages", len(reports) - len(data), "cover, glossary and parameter pages")
+    add("inventory", "unpublished_dashboards", len(unpublished), "no LUID; excluded from reports")
+    for k, v in restricted.items():
+        add("inventory", f"restricted_{k}", v, "not visible to the PAT owner")
+
+    kinds = Counter(d["kind"] for d in datasources.values())
+    add("datasources", "datasources", len(datasources))
+    for k in ("published", "embedded", "embedded-proxy"):
+        add("datasources", k, kinds.get(k, 0))
+    add("datasources", "with_extracts", sum(1 for d in datasources.values() if d.get("extract")))
+    if had_wc:
+        add("datasources", "sources_filled_by_rest", filled["embedded"] + filled["published"],
+            "unknown sources resolved by step 03b")
+
+    st = Counter(r["lineage_status"] for r in reports)
+    for k, desc in LINEAGE_STATUS_HELP.items():
+        add("lineage", f"status_{k}", st.get(k, 0), desc)
+    add("lineage", "warehouse_tables", len(TABLES))
+    confs = Counter(c["confidence"] for c in custom_sql.values())
+    add("lineage", "custom_sql_blocks", len(custom_sql))
+    for k in ("tableau", "regex", "unparsed", "restricted"):
+        add("lineage", f"custom_sql_{k}", confs.get(k, 0),
+            {"tableau": "tables parsed by Tableau", "regex": "tables parsed by FROM/JOIN extraction",
+             "unparsed": "needs manual review", "restricted": "not visible to the PAT owner"}[k])
+
+    by_type, by_host = Counter(), Counter()
+    for r in data:
+        for t in filter(None, r["source_types"].split("; ")):
+            by_type[t] += 1
+        for h in filter(None, r["source_hosts"].split("; ")):
+            by_host[h] += 1
+    for t, n in by_type.most_common():
+        add("source_types", t, n, "data-bearing reports using this connection type")
+    add("source_hosts", "distinct_hosts", len(by_host))
+    for h, n in by_host.most_common():
+        add("source_hosts", h, n, "data-bearing reports using this server")
+
+    if vu:
+        w = vu.get("window") or {}
+        add("usage_snapshots", "source", w.get("source"))
+        add("usage_snapshots", "snapshots", w.get("snapshots"))
+        add("usage_snapshots", "window_days", w.get("usage_days"), "first to latest snapshot")
+        if w.get("usage_days") != "lifetime":
+            add("usage_snapshots", "reports_accessed", sum(1 for r in reports if (r.get("view_accesses") or 0) > 0),
+                "reports opened between first and latest snapshot")
+    if tu:
+        w = tu.get("window") or {}
+        add("usage_traffic", "window_start", w.get("window_start"))
+        add("usage_traffic", "window_end", w.get("window_end"))
+        add("usage_traffic", "window_days", w.get("window_days"))
+        add("usage_traffic", "access_events", w.get("events"))
+        add("usage_traffic", "views_matched", w.get("matched_views"))
+        add("usage_traffic", "views_unmatched", w.get("unmatched_views"), "had traffic, no longer exist")
+        hit = [r for r in reports if (r.get("traffic_accesses") or 0) > 0]
+        add("usage_traffic", "reports_accessed", len(hit), "reports opened in the window")
+        add("usage_traffic", "data_bearing_not_accessed", sum(1 for r in data if not (r.get("traffic_accesses") or 0)),
+            "data-bearing reports with no opens in the traffic window")
+    rc = Counter(r.get("retire_candidate") for r in reports)
+    add("retire", "candidates_to_retire", rc.get("yes", 0), "retire_candidate = yes; pending owner confirmation")
+    add("retire", "review", rc.get("review", 0), "created inside the usage window; too new to judge")
+    add("retire", "keep", rc.get("no", 0), "opened in a usage window")
+    add("retire", "unknown", rc.get("unknown", 0), "not enough windowed usage to judge")
+    add("retire", "not_applicable", rc.get("n/a", 0), "no-datasource pages")
+    if raw.get("errors"):
+        add("site", "fetch_errors", ", ".join(raw["errors"]), "see report-lineage-raw.json")
+
+    cols = ["site", "section", "metric", "value", "description"]
+    with open(dest / "summary.csv", "w", newline="", encoding="utf-8") as fh:
+        wr = csv.DictWriter(fh, fieldnames=cols, lineterminator="\n")
+        wr.writeheader()
+        wr.writerows(rows)
+
+    # Cross-site rollup from every sibling site folder's summary.csv.
+    root = out_dir.parent
+    stacked, order, sites = [], [], []
+    for p in sorted(root.glob("*/report-inventory/summary.csv")):
+        with open(p, encoding="utf-8") as fh:
+            for r in csv.DictReader(fh):
+                stacked.append(r)
+                key = (r["section"], r["metric"])
+                if key not in order:
+                    order.append(key)
+                if r["site"] not in sites:
+                    sites.append(r["site"])
+    if not stacked:
+        return
+    server = root / "_server"
+    server.mkdir(parents=True, exist_ok=True)
+    with open(server / "summary-all-sites.csv", "w", newline="", encoding="utf-8") as fh:
+        wr = csv.DictWriter(fh, fieldnames=cols, lineterminator="\n")
+        wr.writeheader()
+        wr.writerows(stacked)
+    val = {(r["section"], r["metric"], r["site"]): r["value"] for r in stacked}
+    desc = {(r["section"], r["metric"]): r["description"] for r in stacked if r["description"]}
+    with open(server / "summary-all-sites-wide.csv", "w", newline="", encoding="utf-8") as fh:
+        wr = csv.writer(fh, lineterminator="\n")
+        wr.writerow(["section", "metric"] + sites + ["description"])
+        for sec, met in order:
+            wr.writerow([sec, met] + [val.get((sec, met, s), "") for s in sites] + [desc.get((sec, met), "")])
+    log(f"Summary: {dest / 'summary.csv'}; all sites ({len(sites)}): {server / 'summary-all-sites-wide.csv'}")
 
 
 if __name__ == "__main__":
