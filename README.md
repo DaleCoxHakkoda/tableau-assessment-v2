@@ -306,7 +306,8 @@ Step 10 also rebuilds three cross-site files in `output/_server/` from every sit
 |---|---|---|
 | `summary-rollup.csv` | one row per metric: the all-sites total | The rollup to paste into a workbook or deck. |
 | `summary-all-sites-wide.csv` | one row per metric: `ALL_SITES`, then one column per site | Totals next to the per-site breakdown. |
-| `summary-all-sites.csv` | every site's rows stacked, plus `ALL_SITES` rows | Import or pivot tables. |
+| `summary-sources.csv` | one row per connection type and per database host: `ALL_SITES`, then one column per site, busiest first | The source detail, kept out of the two files above, which show only the distinct counts. |
+| `summary-all-sites.csv` | every site's rows stacked, plus `ALL_SITES` rows | Import or pivot tables (includes the source detail). |
 
 The `rollup` column says how each total was formed. Counts are summed (`sum`, or
 `sum of N of M sites` when some sites have not run that step). Warehouse tables and
@@ -397,7 +398,7 @@ Planned as step 13 (`sequence_migration.py`) once the pipeline DAG exists:
 ## Versions
 
 The repo version is in `VERSION` at the root. Every script prints it on its first line
-(`tableau-assessment-py 2026.11.10.2; loaded config from ...`), `run.log` records it on each
+(`tableau-assessment-py 2026.11.10.3; loaded config from ...`), `run.log` records it on each
 run's header line, and `summary.csv` carries it as `code_version`, so any output can be
 traced to the code that produced it. Bump `VERSION` with each change.
 
