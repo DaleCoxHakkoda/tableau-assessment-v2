@@ -115,7 +115,8 @@ def main():
                         logf.write(f"--- 02b skipped: {why}\n")
                         results[step] = "skip"
                         continue
-                cmd = [sys.executable, str(HERE / STEPS[step]), "--site", site or "default"]
+                # UTF-8 mode, so workbook names outside the Windows code page pass through the pipe.
+                cmd = [sys.executable, "-X", "utf8", str(HERE / STEPS[step]), "--site", site or "default"]
                 if step == "02":
                     cmd += ["--with-users"] if args.with_users else []
                     cmd += ["--force"] if args.force_snapshot else []
@@ -126,7 +127,7 @@ def main():
                 if step == "05" and args.allow_no_node:
                     cmd += ["--allow-no-node"]
                 print(f"-- {step} {STEPS[step]}", flush=True)
-                proc = subprocess.run(cmd, capture_output=True, text=True)
+                proc = subprocess.run(cmd, capture_output=True, encoding="utf-8", errors="replace")
                 sys.stdout.write(proc.stdout)
                 sys.stderr.write(proc.stderr)
                 logf.write(f"--- {step} exit {proc.returncode}\n{proc.stdout}{proc.stderr}")

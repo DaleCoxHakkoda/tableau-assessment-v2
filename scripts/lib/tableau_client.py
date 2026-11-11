@@ -46,6 +46,13 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+# A workbook name the console cannot show must not crash a run (Windows code pages).
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(errors="backslashreplace")
+    except (AttributeError, ValueError):
+        pass
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 

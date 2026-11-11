@@ -67,7 +67,8 @@ def node_available():
     if not node:
         return None
     try:
-        v = subprocess.run([node, "--version"], capture_output=True, text=True, timeout=20)
+        v = subprocess.run([node, "--version"], capture_output=True, encoding="utf-8", errors="replace",
+                           timeout=20)
         return v.stdout.strip() if v.returncode == 0 else None
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -76,8 +77,10 @@ def node_available():
 def scan_one(luid, twb, report_dir, timeout):
     report_dir.mkdir(parents=True, exist_ok=True)
     md = report_dir / f"{luid}-gaps-report.md"
-    proc = subprocess.run([sys.executable, "-I", str(SCANNER), str(twb), str(md)],
-                          capture_output=True, text=True, timeout=timeout)
+    # -X utf8: on Windows the scanner would otherwise decode the Node helper's UTF-8 output
+    # with the ANSI code page and fail on formulas with characters outside it.
+    proc = subprocess.run([sys.executable, "-I", "-X", "utf8", str(SCANNER), str(twb), str(md)],
+                          capture_output=True, encoding="utf-8", errors="replace", timeout=timeout)
     js = md.with_suffix(".json")
     if proc.returncode or not js.exists():
         detail = (proc.stderr or proc.stdout or "").strip().splitlines()
