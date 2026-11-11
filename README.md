@@ -144,7 +144,7 @@ and appends each site's output to `output/<site>/run.log`.
 | 02b | `import_traffic_to_views.py` | ready; the runner runs it when a new export is present | `traffic-to-views/*.csv` (manual export) | `traffic-usage.json`, `.csv`, `traffic-unmatched.csv` |
 | 03 | `fetch_report_lineage.py` | ready | Metadata API | `report-lineage-raw.json` |
 | 03b | `fetch_workbook_connections.py` | ready | REST connections | `workbook-connections.json` |
-| 04 | `fetch_workbooks.py` | ready | REST | `twbs/<luid>.twb`, `twb-fetch-results.json` |
+| 04 | `fetch_workbooks.py` | ready | REST | `twbs/<luid>.twb`, `twb-fetch-results.json`, `twb-fetch-errors.log` (full error responses) |
 | 05 | `complexity.py` | ready (Node.js) | `twbs/`, vendored Sigma scanner | `gaps/<luid>/`, `complexity.json`, `.csv` |
 | 10 | `build_report_inventory.py` | ready | 02 to 03b | `report-inventory/`, `_server/` rollups |
 | 11 | `workbook_priority.py` | ready | `reports.csv`, `tables.csv`, edges, `complexity.json` | `workbooks.csv`, `clusters.csv`, `pipeline-priority.csv`, `migration-plan.json`; `_server/pipeline-priority-all-sites.csv` |

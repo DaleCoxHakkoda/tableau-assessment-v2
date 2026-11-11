@@ -162,9 +162,45 @@ class TransientError(TableauError):
 
 
 class HTTPStatusError(TableauError):
-    def __init__(self, status, msg):
+    """An HTTP error response. Tableau's own error (code, summary, detail) is parsed out of
+    the XML or JSON body when present; .body keeps the full response text."""
+
+    def __init__(self, status, msg, body="", method="", url=""):
         super().__init__(msg)
-        self.status = status
+        self.status, self.body, self.method, self.url = status, body, method, url
+        self.code, self.summary, self.detail = parse_tableau_error(body)
+
+    def short(self):
+        """One line without the URL: HTTP 400 [400xxx] Summary: detail."""
+        if self.code or self.summary or self.detail:
+            return f"HTTP {self.status} [{self.code or '?'}] {self.summary}: {self.detail}".strip(": ")
+        return f"HTTP {self.status}: {' '.join(self.body.split())[:300]}"
+
+
+def parse_tableau_error(body):
+    """(code, summary, detail) from a Tableau REST error body, XML or JSON; blanks if neither."""
+    body = (body or "").strip()
+    if not body:
+        return "", "", ""
+    if body.startswith("{"):
+        try:
+            err = json.loads(body).get("error") or {}
+            return str(err.get("code") or ""), err.get("summary") or "", err.get("detail") or ""
+        except (ValueError, AttributeError):
+            return "", "", ""
+    try:
+        import xml.etree.ElementTree as ET
+        root = ET.fromstring(body)
+    except Exception:  # noqa: BLE001 - any parse failure just means "not Tableau's format"
+        return "", "", ""
+    err = next((el for el in root.iter() if el.tag.split("}")[-1] == "error"), None)
+    if err is None:
+        return "", "", ""
+
+    def text(name):
+        el = next((c for c in err if c.tag.split("}")[-1] == name), None)
+        return (el.text or "").strip() if el is not None else ""
+    return err.get("code") or "", text("summary"), text("detail")
 
 
 # ---------------------------------------------------------------- client
@@ -212,8 +248,10 @@ class TableauClient:
             with urllib.request.urlopen(req, timeout=timeout, context=self._ssl) as r:
                 raw = r.read()
         except urllib.error.HTTPError as e:
-            detail = e.read().decode(errors="replace")[:800]
-            raise HTTPStatusError(e.code, f"{method} {url} -> HTTP {e.code}: {detail}") from None
+            body = e.read().decode(errors="replace")[:65536]
+            err = HTTPStatusError(e.code, "", body=body, method=method, url=url)
+            err.args = (f"{method} {url} -> {err.short()}",)
+            raise err from None
         except urllib.error.URLError as e:
             raise TransientError(f"{method} {url} -> {e.reason}") from None
         except (http.client.HTTPException, ConnectionError, TimeoutError) as e:

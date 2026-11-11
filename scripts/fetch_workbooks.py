@@ -20,10 +20,14 @@ What it does:
 Writes to output/<site>/:
   twbs/<workbook luid>.twb      the workbook XML
   twb-fetch-results.json        per workbook: name, project, owner, updated_at, size, kind,
-                                file, error (if any)
+                                file; for a failure error (one line: HTTP status, Tableau's
+                                error code, summary and detail), error_status, error_code
+  twb-fetch-errors.log          text log, appended each run: every failure with the request,
+                                the status and Tableau's FULL response body
 """
 
 import argparse
+from collections import Counter
 import io
 import json
 import queue
@@ -35,8 +39,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from lib.tableau_client import (TableauClient, TableauError, add_site_args, log,  # noqa: E402
-                                resolve_site_args)
+from lib.tableau_client import (HTTPStatusError, TableauClient, TableauError, add_site_args,  # noqa: E402
+                                code_version, log, resolve_site_args)
 
 
 def twb_from_bytes(data):
@@ -101,6 +105,9 @@ def main():
             q.put(luid)
         lock = threading.Lock()
         done = [0]
+        err_log = open(out / "twb-fetch-errors.log", "a", encoding="utf-8")
+        err_log.write(f"\n===== {datetime.now(timezone.utc).isoformat(timespec='seconds')}  site {site}  "
+                      f"code {code_version()}  {len(todo)} to download =====\n")
         start = time.time()
 
         def worker():
@@ -117,10 +124,24 @@ def main():
                     (twb_dir / f"{luid}.twb").write_bytes(xml)
                     upd = {"size": len(xml), "download_size": len(data), "kind": kind,
                            "file": f"twbs/{luid}.twb", "error": None, "cached": False}
+                except HTTPStatusError as e:
+                    upd = {"error": e.short()[:1000], "error_status": e.status, "error_code": e.code,
+                           "cached": False}
+                    full = (f"--- {luid}  {rec.get('name')}  (project {rec.get('project')})\n"
+                            f"{e.method} {e.url}\nHTTP {e.status}  code {e.code or '-'}\n"
+                            f"summary: {e.summary or '-'}\ndetail:  {e.detail or '-'}\nresponse body:\n{e.body}\n")
                 except (TableauError, ValueError, zipfile.BadZipFile, OSError) as e:
-                    upd = {"error": str(e)[:300], "cached": False}
+                    upd = {"error": str(e)[:1000], "error_status": None, "error_code": None, "cached": False}
+                    full = f"--- {luid}  {rec.get('name')}  (project {rec.get('project')})\n{type(e).__name__}: {e}\n"
+                else:
+                    full = None
                 with lock:
+                    for k in ("error_status", "error_code"):
+                        rec.pop(k, None)
                     rec.update(upd)
+                    if full:
+                        err_log.write(full)
+                        err_log.flush()
                     done[0] += 1
                     n = done[0]
                     if upd.get("error"):
@@ -135,11 +156,17 @@ def main():
             t.start()
         for t in threads:
             t.join()
+        err_log.close()
 
     meta_errors = sum(1 for r in results.values() if r.get("error"))
     results_path.write_text(json.dumps(results, indent=2))
     log(f"Wrote {len(results) - meta_errors} workbooks to {twb_dir} "
         f"({meta_errors} errors, {cached} unchanged); results: {results_path}")
+    if meta_errors:
+        by = Counter(f"HTTP {r.get('error_status')} [{r.get('error_code') or '-'}]" if r.get("error_status")
+                     else "other" for r in results.values() if r.get("error"))
+        log("Errors by type: " + ", ".join(f"{k} x{n}" for k, n in by.most_common())
+            + f"; full responses in {out / 'twb-fetch-errors.log'}")
     (out / "twb-fetch-results.meta.json").write_text(json.dumps(
         {"fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
          "workbooks": len(results), "errors": meta_errors, "excluded_projects": sorted(excluded)}, indent=2))
