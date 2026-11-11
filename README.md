@@ -215,6 +215,7 @@ All in `output/<site>/report-inventory/`:
 | `edges_report_datasource.csv` | report × datasource | Graph edges. Embedded datasources that proxy a published one carry its LUID. |
 | `edges_datasource_table.csv` | datasource × table | Graph edges, with `via` = `direct`, `custom_sql:tableau` or `custom_sql:regex`. |
 | `custom_sql.csv` | one row per custom SQL block | Tables parsed by Tableau where it can, regex FROM/JOIN extraction where it cannot, `unparsed` for manual review. |
+| `host-aliases.csv` | one row per raw host spelling | How each host name seen was normalized, so the collapsing can be checked. |
 | `summary.csv` | one row per metric | The run's headline numbers (inventory, datasources, lineage status, source types and hosts, snapshot and traffic usage, including the count of candidates to retire) as `site, section, metric, value, description`. Paste or import into a workbook. |
 | `lineage-graph.json` | nodes + edges | Load into a graph tool or stitch to the pipeline DAG. |
 
@@ -232,7 +233,7 @@ All in `output/<site>/report-inventory/`:
 | `no-source-info` | No tables or connection info, even from REST connections. | Run step 03b if you have not; otherwise inspect the workbook. |
 
 `source_types` lists the datasource connection types (e.g. `sqlserver; excel-direct`),
-`source_hosts` the database servers behind them, and `source_info` where that came from:
+`source_hosts` the database servers behind them (normalized, see below), and `source_info` where that came from:
 `metadata` (Metadata API), `rest` (REST connections, step 03b), or `rest-inferred` (the
 workbook's only unknown datasource took its only unmatched connections).
 
@@ -296,6 +297,21 @@ Views) or 2026-10-30..2026-11-10 (usage snapshots); pending owner confirmation",
 criteria travel with the flag. Annual reports (year-end, regulatory) can look unused in
 a six-month window: confirm with the `owner` before acting. `summary.csv` counts each
 value under the `retire` section.
+
+### Host names
+
+The same server is spelled many ways across workbooks, so step 10 normalizes every host
+before counting it (`scripts/lib/hosts.py`): lower-case; drop a trailing port (`,1433`,
+` , 1433`, `:1433`); drop the company domains in `HOST_DOMAINS` (as `.domain` or
+`@domain`); and collapse every spelling of the local machine (`local`, `(local)`,
+`localhost`, `127.0.0.1`, `::1`, `.`, with or without an instance such as
+`(local)\sqlexpress`) to `localhost`. A named instance on a real server is kept
+(`p196\inst`). With `HOST_DOMAINS=regence.com`, `P196.regence.com,1433` becomes `p196`.
+`host-aliases.csv` lists every raw spelling and what it became. The cross-site rollup applies
+the same rules to older site summaries, so they merge correctly too.
+
+`localhost` hosts mean the workbook was built against a database on the author's own
+machine: the source is unreachable from the server and needs its real home identified.
 
 ### Combining sites
 
@@ -398,7 +414,7 @@ Planned as step 13 (`sequence_migration.py`) once the pipeline DAG exists:
 ## Versions
 
 The repo version is in `VERSION` at the root. Every script prints it on its first line
-(`tableau-assessment-py 2026.11.10.3; loaded config from ...`), `run.log` records it on each
+(`tableau-assessment-py 2026.11.11; loaded config from ...`), `run.log` records it on each
 run's header line, and `summary.csv` carries it as `code_version`, so any output can be
 traced to the code that produced it. Bump `VERSION` with each change.
 

@@ -44,7 +44,22 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from lib.hosts import normalize_host  # noqa: E402
 from lib.tableau_client import add_site_args, cfg, code_version, resolve_site_args  # noqa: E402
+
+HOST_ALIASES = defaultdict(int)  # (raw, normalized) -> times seen
+
+
+def nh(raw):
+    """Normalized host name (see lib/hosts.py); records the raw spelling for host-aliases.csv."""
+    norm = normalize_host(raw)
+    if raw and norm:
+        HOST_ALIASES[(str(raw).strip(), norm)] += 1
+    return norm
+
+
+def hosts_of(items, key):
+    return uniq(h for h in (nh(i.get(key)) for i in items or []) if h)
 
 
 def log(msg):
@@ -123,7 +138,7 @@ def table_key(t):
     TABLES.setdefault(key, {
         "table_key": key, "database": db, "schema": schema, "table": name,
         "connection_type": t.get("connectionType") or dig(t, "database", "connectionType"),
-        "host": dig(t, "database", "hostName"),
+        "host": nh(dig(t, "database", "hostName")),
     })
     return key
 
@@ -297,7 +312,7 @@ def main():
             "tables": table_keys(pd.get("upstreamTables")), "custom_sql": [], "published": [],
             "db_types": uniq((d.get("connectionType") or "").lower() for d in pd.get("upstreamDatabases") or []
                              if d.get("connectionType")),
-            "hosts": uniq(d.get("hostName") for d in pd.get("upstreamDatabases") or [] if d.get("hostName")),
+            "hosts": hosts_of(pd.get("upstreamDatabases"), "hostName"),
             "source_info": "metadata",
         }
     pub_by_luid = {p["luid"]: p for p in published.values()}
@@ -310,7 +325,7 @@ def main():
         if not p["db_types"] and not p["tables"] and p["luid"] in pds_conns:
             conns = pds_conns[p["luid"]]
             p["db_types"] = uniq((c.get("type") or "").lower() for c in conns if c.get("type"))
-            p["hosts"] = uniq(c.get("server_address") for c in conns if c.get("server_address"))
+            p["hosts"] = hosts_of(conns, "server_address")
             p["source_info"] = "rest"
             filled["published"] += bool(p["db_types"])
 
@@ -386,7 +401,7 @@ def main():
                 "custom_sql": list(ds_custom.get(ed["id"], [])),
                 "db_types": uniq([(d.get("connectionType") or "").lower() for d in ed.get("upstreamDatabases") or []
                                   if d.get("connectionType")] + [t for p in pub for t in p["db_types"]]),
-                "hosts": uniq([d.get("hostName") for d in ed.get("upstreamDatabases") or [] if d.get("hostName")]
+                "hosts": uniq(hosts_of(ed.get("upstreamDatabases"), "hostName")
                               + [h for p in pub for h in p.get("hosts") or []]),
                 "source_info": "rest" if not ed.get("upstreamDatabases") and any(
                     p.get("source_info") == "rest" for p in pub) else "metadata",
@@ -398,7 +413,7 @@ def main():
                 if hit:
                     matched_names.add(key)
                     rec["db_types"] = uniq((c.get("type") or "").lower() for c in hit if c.get("type"))
-                    rec["hosts"] = uniq(c.get("server_address") for c in hit if c.get("server_address"))
+                    rec["hosts"] = hosts_of(hit, "server_address")
                     rec["source_info"] = "rest"
                     filled["embedded"] += bool(rec["db_types"])
         # A workbook with exactly one still-unknown datasource and leftover unmatched connections:
@@ -408,7 +423,7 @@ def main():
         if len(still) == 1 and left:
             r = still[0]
             r["db_types"] = uniq((c.get("type") or "").lower() for c in left if c.get("type"))
-            r["hosts"] = uniq(c.get("server_address") for c in left if c.get("server_address"))
+            r["hosts"] = hosts_of(left, "server_address")
             r["source_info"] = "rest-inferred"
             filled["embedded"] += bool(r["db_types"])
 
@@ -622,6 +637,9 @@ def main():
         return [c for c in uniq(k for r in rows for k in r) if c not in drop]
 
     write_csv("reports.csv", reports, report_cols(reports))
+    write_csv("host-aliases.csv", [{"raw_host": r, "normalized_host": n, "times_seen": c}
+                                   for (r, n), c in sorted(HOST_ALIASES.items(), key=lambda x: (x[0][1], x[0][0]))],
+              ["raw_host", "normalized_host", "times_seen"])
     write_csv("unpublished_dashboards.csv", unpublished, report_cols(unpublished))
     write_csv("edges_report_datasource.csv", edges_rep_ds)
     write_csv("edges_datasource_table.csv", ds_tables_rows)
@@ -751,6 +769,7 @@ def write_summary(out_dir, dest, reports, unpublished, datasources, custom_sql, 
             by_type[t] += 1
         for h in filter(None, r["source_hosts"].split("; ")):
             by_host[h] += 1
+    add("source_types", "distinct_types", len(by_type))
     for t, n in by_type.most_common():
         add("source_types", t, n, "data-bearing reports using this connection type")
     add("source_hosts", "distinct_hosts", len(by_host))
@@ -806,8 +825,13 @@ def write_summary(out_dir, dest, reports, unpublished, datasources, custom_sql, 
                     sites.append(r["site"])
     if not stacked:
         return
+    stacked, order = merge_host_rows(stacked)
+    if ("source_types", "distinct_types") not in order and any(k[0] == "source_types" for k in order):
+        order.insert(next(i for i, k in enumerate(order) if k[0] == "source_types"), ("source_types", "distinct_types"))
     val = {(r["section"], r["metric"], r["site"]): r["value"] for r in stacked}
     desc = {(r["section"], r["metric"]): r["description"] for r in stacked if r["description"]}
+    desc.setdefault(("source_types", "distinct_types"), "distinct connection types; full list in summary-sources.csv")
+    desc.setdefault(("source_hosts", "distinct_hosts"), "distinct database servers; full list in summary-sources.csv")
     access = site_access(root)
     # Sites below Site Administrator (PARTIAL) or without access stay out of the totals: their
     # inventory covers only what the PAT owner can open. Their size is reported under coverage.
@@ -833,6 +857,8 @@ def write_summary(out_dir, dest, reports, unpublished, datasources, custom_sql, 
         for m, v, h, d in coverage:
             wr.writerow(["coverage", m, v, h] + [""] * len(sites) + [d])
         for sec, met in order:
+            if is_source_detail(sec, met):
+                continue
             wr.writerow([sec, met, totals[(sec, met)], how[(sec, met)]]
                         + [val.get((sec, met, s), "") for s in sites] + [desc.get((sec, met), "")])
     with open(server / "summary-rollup.csv", "w", newline="", encoding="utf-8") as fh:
@@ -842,13 +868,50 @@ def write_summary(out_dir, dest, reports, unpublished, datasources, custom_sql, 
             wr.writerow(["coverage", m, v, h, d])
         wr.writerow(["site", "sites", len(in_total), "count", "sites in the totals below: " + ", ".join(in_total)])
         for sec, met in order:
-            if how[(sec, met)] != "per-site only":
+            if how[(sec, met)] != "per-site only" and not is_source_detail(sec, met):
                 wr.writerow([sec, met, totals[(sec, met)], how[(sec, met)], desc.get((sec, met), "")])
-    log(f"Summary: {dest / 'summary.csv'}; rollup across {len(in_total)} site(s): {server / 'summary-rollup.csv'}")
+    # Source types and hosts: one row each, sites side by side, busiest first.
+    with open(server / "summary-sources.csv", "w", newline="", encoding="utf-8") as fh:
+        wr = csv.writer(fh, lineterminator="\n")
+        wr.writerow(["kind", "name", "ALL_SITES"] + in_total)
+        for sec, kind in (("source_types", "connection type"), ("source_hosts", "database host")):
+            keys = [k for k in order if k[0] == sec and is_source_detail(*k)]
+            keys.sort(key=lambda k: -(_num(totals[k]) or 0))
+            for k in keys:
+                wr.writerow([kind, k[1], totals[k]] + [val.get((k[0], k[1], s), "") for s in in_total])
+    log(f"Summary: {dest / 'summary.csv'}; rollup across {len(in_total)} site(s): {server / 'summary-rollup.csv'} "
+        f"(source types and hosts: summary-sources.csv)")
     cov = {m: v for m, v, _, _ in coverage}
     if cov.get("sites_pending_access"):
         log(f"Coverage: {cov['workbooks_assessed']} workbooks assessed, {cov['workbooks_not_assessed']} not assessed "
             f"({cov['coverage_pct']}% coverage); pending access: {cov['sites_pending_access']}")
+
+
+def merge_host_rows(stacked):
+    """Normalize source_hosts names in every site's rows and add up spellings of one server."""
+    merged, order = {}, []
+    for r in stacked:
+        r = dict(r)
+        if r["section"] == "source_hosts" and not r["metric"].startswith("distinct_"):
+            r["metric"] = normalize_host(r["metric"]) or r["metric"]
+        k = (r["site"], r["section"], r["metric"])
+        if k in merged and r["section"] == "source_hosts":
+            merged[k]["value"] = (_num(merged[k]["value"]) or 0) + (_num(r["value"]) or 0)
+        else:
+            merged[k] = r
+        if (r["section"], r["metric"]) not in order:
+            order.append((r["section"], r["metric"]))
+    # A site's own distinct_hosts may predate normalization: recount it from its merged rows.
+    for site in {k[0] for k in merged}:
+        n = sum(1 for (s, sec, met) in merged if s == site and sec == "source_hosts" and not met.startswith("distinct_"))
+        if (site, "source_hosts", "distinct_hosts") in merged:
+            merged[(site, "source_hosts", "distinct_hosts")]["value"] = n
+    return list(merged.values()), order
+
+
+def is_source_detail(sec, met):
+    """Per-type and per-host rows: kept in summary-sources.csv, not in the main rollup."""
+    return sec in ("source_types", "source_hosts") and not met.startswith("distinct_")
 
 
 # How each metric combines across sites. Anything not listed is summed when every value is a number.
@@ -938,6 +1001,10 @@ def rollup_totals(root, order, sites, val):
             totals[key], how[key] = len(tables), "distinct across sites"
         elif key == ("source_hosts", "distinct_hosts"):
             totals[key], how[key] = len(hosts), "distinct across sites"
+        elif key == ("source_types", "distinct_types"):
+            types = {met for sec, met in order if sec == "source_types" and met != "distinct_types"
+                     and any(val.get((sec, met, s)) not in (None, "") for s in sites)}
+            totals[key], how[key] = len(types), "distinct across sites"
         elif key in PER_SITE_ONLY:
             totals[key], how[key] = "", "per-site only"
         elif key in EARLIEST:
