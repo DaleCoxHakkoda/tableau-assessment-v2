@@ -816,8 +816,8 @@ def write_summary(out_dir, dest, reports, unpublished, datasources, custom_sql, 
 
 SUMMARY_COLS = ["site", "section", "metric", "value", "description"]
 SECTION_ORDER = ["site", "inventory", "datasources", "lineage", "source_types", "source_hosts",
-                 "usage_snapshots", "usage_traffic", "retire", "workbooks", "pipelines", "consolidation"]
-LATER_SECTIONS = {"workbooks", "pipelines", "consolidation"}
+                 "usage_snapshots", "usage_traffic", "retire", "workbooks", "pipelines", "gaps", "consolidation"]
+LATER_SECTIONS = {"workbooks", "pipelines", "gaps", "consolidation"}
 
 
 def write_summary_rows(dest, rows):
@@ -873,8 +873,9 @@ def rebuild_cross_site(out_dir):
     in_total = [s for s in sites if access.get(s, {}).get("access", "FULL") == "FULL"]
     excluded = [s for s in sites if s not in in_total]
     totals, how = rollup_totals(root, order, in_total, val)
-    # Pipeline counts share tables across sites, so step 11 computes them over all sites together.
-    pt = root / "_server" / "pipeline-totals.json"
+    # Pipeline and gap counts share tables and features across sites, so step 11 computes them
+    # over all full-access sites together.
+    pt = root / "_server" / "step11-totals.json"
     if pt.exists():
         try:
             ptj = json.loads(pt.read_text(encoding="utf-8"))

@@ -16,6 +16,10 @@ skipped and the runner moves on to the next site. If sign-in fails on two sites
 in a row, the runner stops (four consecutive failures lock the PAT). Each site writes to
 output/<site>/ and a per-site log to output/<site>/run.log, headed with the code version.
 
+The migration steps are skipped on a site where the PAT user is not Site Administrator
+(step 00 records the role): without it Tableau refuses most workbook downloads (403019),
+and such sites are outside the totals. --include-partial runs them anyway.
+
 Steps always run in pipeline order (00, 02, 02b, 03, 03b, 04, 05, 10, 11, 12), whatever
 order --steps lists them in. The default is the inventory (00-10), which is what a weekly
 usage run needs. --with-migration adds the migration-planning steps: step 04 downloads
@@ -54,6 +58,30 @@ INVENTORY_STEPS = ["00", "02", "02b", "03", "03b", "10"]
 MIGRATION_STEPS = ["04", "05", "11", "12"]
 
 
+def site_role(out):
+    """Role from the site's latest step 00 check, or '' if it has not run."""
+    cj = out / "connectivity.json"
+    try:
+        return json.loads(cj.read_text(encoding="utf-8")).get("site_role") or "" if cj.exists() else ""
+    except ValueError:
+        return ""
+
+
+def migration_skip_reason(out):
+    """Why the migration steps (04, 05, 11, 12) should not run on this site, or None.
+
+    Without Site Administrator, Tableau lets the PAT user download only workbooks they hold the
+    Download/Save a Copy permission on (the rest fail with 403019), and the site is left out of
+    the totals anyway, so the time and the errors buy nothing."""
+    role = site_role(out)
+    if not role:
+        return "no role recorded (run step 00 first); --include-partial to run anyway"
+    if role.startswith(("SiteAdministrator", "ServerAdministrator")):
+        return None
+    return (f"role {role} is not Site Administrator, so only some workbooks can be downloaded and the site "
+            f"is outside the totals; --include-partial to run anyway")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--site", action="append", default=[], help="repeatable; 'default' for the Server Default site")
@@ -63,6 +91,8 @@ def main():
     ap.add_argument("--with-migration", action="store_true",
                     help=f"add the migration-planning steps {','.join(MIGRATION_STEPS)}")
     ap.add_argument("--allow-no-node", action="store_true", help="passed to step 05")
+    ap.add_argument("--include-partial", action="store_true",
+                    help="also run the migration steps on sites where the PAT user is not Site Administrator")
     ap.add_argument("--exclude-projects", default=None, help="passed to step 04")
     ap.add_argument("--with-users", action="store_true", help="passed to step 02")
     ap.add_argument("--force-snapshot", action="store_true",
@@ -108,6 +138,13 @@ def main():
             logf.write(f"\n=== {datetime.now().isoformat(timespec='seconds')} steps {','.join(steps)} "
                        f"(tableau-assessment-py {code_version()})\n")
             for step in steps:
+                if step in MIGRATION_STEPS and not args.include_partial:
+                    why = migration_skip_reason(out)
+                    if why:
+                        print(f"-- {step} skipped: {why}", flush=True)
+                        logf.write(f"--- {step} skipped: {why}\n")
+                        results[step] = "skip(role)"
+                        continue
                 if step == "02b":
                     why = traffic_import_skip_reason(out)
                     if why:

@@ -73,6 +73,13 @@ def main():
     excluded = {p.strip() for p in args.exclude_projects.split(",") if p.strip()}
 
     with TableauClient(site) as client:
+        try:
+            role = (client.current_user() or {}).get("siteRole") or ""
+        except TableauError:
+            role = ""
+        if role and not role.startswith(("SiteAdministrator", "ServerAdministrator")):
+            log(f"WARNING: site role {role}: only workbooks you may download (Download/Save a Copy permission) "
+                f"will succeed; the rest fail with HTTP 403 [403019]")
         log("Listing workbooks")
         wbs = list(client.rest_paged("/workbooks", "workbooks", "workbook", page_size=100))
         if excluded:

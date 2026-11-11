@@ -111,7 +111,10 @@ python scripts/run_sites.py --all --with-migration
 ```
 
 The runner always runs steps in pipeline order. `--with-migration` adds 04, 05, 11 and 12
-to whatever `--steps` lists. The first step 04 run downloads every workbook (no extract
+to whatever `--steps` lists. It skips those four on any site where the PAT user is not Site
+Administrator (the role step 00 records): Tableau then refuses most workbook downloads
+(HTTP 403, code 403019), and the site is outside the totals anyway. The summary shows
+`skip(role)`; `--include-partial` runs them regardless. The first step 04 run downloads every workbook (no extract
 data, so it stays small); later runs fetch only workbooks republished since.
 
 Single site, step by step:
@@ -147,7 +150,7 @@ and appends each site's output to `output/<site>/run.log`.
 | 04 | `fetch_workbooks.py` | ready | REST | `twbs/<luid>.twb`, `twb-fetch-results.json`, `twb-fetch-errors.log` (full error responses) |
 | 05 | `complexity.py` | ready (Node.js) | `twbs/`, vendored Sigma scanner | `gaps/<luid>/`, `complexity.json`, `.csv` |
 | 10 | `build_report_inventory.py` | ready | 02 to 03b | `report-inventory/`, `_server/` rollups |
-| 11 | `workbook_priority.py` | ready | `reports.csv`, `tables.csv`, edges, `complexity.json` | `workbooks.csv`, `clusters.csv`, `pipeline-priority.csv`, `migration-plan.json`; `_server/pipeline-priority-all-sites.csv` |
+| 11 | `workbook_priority.py` | ready | `reports.csv`, `tables.csv`, edges, `complexity.json` | `workbooks.csv`, `clusters.csv`, `pipeline-priority.csv`, `gap-features.csv`, `migration-plan.json`; `_server/*-all-sites.csv` |
 | 12 | `consolidation.py` | ready | `twbs/`, `complexity.json`, `migration-plan.json` | `consolidation-candidates.json`, `.csv`; updates `workbooks.csv` and the plan |
 
 ## Migration planning (steps 04, 05, 11, 12)
@@ -215,6 +218,24 @@ all-sites ranking, not a sum of sites.
 
 This is an anchor for the pipeline conversation, not a plan: it knows tables, not the
 Talend jobs behind them. Once the job inventory exists, rank jobs by the tables they write.
+
+### Gap features (step 11): `gap-features.csv`
+
+A workbook is routed to `convert-with-gap-review` for any unhandled feature, so that count
+alone cannot say whether the estate has hundreds of distinct problems or a few repeated
+ones. This file answers it: one row per unhandled or manual feature found in active
+workbooks, unhandled first, ranked by how many active workbooks have it.
+
+| Column | Meaning |
+|---|---|
+| `active_workbooks`, `pct_of_scanned_active`, `occurrences`, `active_accesses` | How widespread the feature is. |
+| `sole_unhandled_for` | Workbooks where it is the only unhandled feature. |
+| `cum_gap_review_cleared`, `cum_pct_gap_review_cleared` | Gap-review workbooks whose unhandled features are all within the top N: the ones a known Sigma pattern for those N would clear. |
+
+`output/_server/gap-features-all-sites.csv` ranks across all full-access sites, and the
+`gaps` section of the rollup gives `cleared_by_top5`, `cleared_by_top10` and
+`features_for_80pct_gap_review` from it. `audit_unavailable_workbooks` should be 0; if not,
+those sites were scanned without Node.js and formula gaps are overstated.
 
 ### Consolidation (step 12)
 

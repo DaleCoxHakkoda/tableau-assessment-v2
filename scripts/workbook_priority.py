@@ -39,15 +39,24 @@ cumulative columns then read "landing the first N tables unlocks X% of active us
 It is an anchor for the pipeline conversation, not a plan: it knows nothing yet about
 the pipelines (Talend jobs) behind each table.
 
+Gap features: which unhandled (and manual) Tableau features recur across the active estate.
+A workbook is tagged needs-gap-review for ANY unhandled feature, so the count alone hides
+whether that is hundreds of distinct problems or a few repeated ones. Unhandled features are
+ranked by how many active workbooks have them; cum_gap_review_cleared counts the gap-review
+workbooks whose unhandled features are ALL within the top N, i.e. that would no longer need
+gap review once those N have a known Sigma pattern.
+
 Writes to output/<site>/report-inventory/:
   workbooks.csv          one row per workbook
   clusters.csv           one row per data-model cluster
   pipeline-priority.csv  one row per warehouse table used by active workbooks, ranked
+  gap-features.csv       one row per unhandled or manual feature in active workbooks, ranked
   migration-plan.json    all of it, plus a summary
 and to output/_server/:
   pipeline-priority-all-sites.csv   the same ranking over every full-access site together
                                     (one table often feeds several sites)
-and adds "workbooks" and "pipelines" sections to summary.csv, then refreshes the rollup.
+  gap-features-all-sites.csv        the gap ranking over every full-access site together
+and adds "workbooks", "pipelines" and "gaps" sections to summary.csv, then refreshes the rollup.
 """
 
 import argparse
@@ -201,6 +210,108 @@ def write_pipeline_csv(path, rows):
         w.writerows(rows)
 
 
+AUDIT_UNAVAILABLE = "Converter-backed formula audit unavailable"
+GAP_COLS = ["gap_rank", "feature", "status", "active_workbooks", "pct_of_scanned_active", "occurrences",
+            "active_accesses", "sole_unhandled_for", "cum_gap_review_cleared", "cum_pct_gap_review_cleared",
+            "example_workbooks"]
+GAP_HELP = {
+    "scanned_active": "active workbooks with a complexity scan",
+    "gap_review_workbooks": "scanned active workbooks with at least one unhandled feature",
+    "unhandled_feature_types": "distinct unhandled features across them",
+    "manual_feature_types": "distinct manual features across scanned active workbooks",
+    "cleared_by_top1": "gap-review workbooks whose only unhandled feature is the most common one",
+    "cleared_by_top5": "gap-review workbooks whose unhandled features are all among the 5 most common",
+    "cleared_by_top10": "the same, for the 10 most common",
+    "features_for_80pct_gap_review": "most common unhandled features that together cover 80% of gap-review workbooks",
+    "audit_unavailable_workbooks": "workbooks scanned without Node.js (formula features overstated)",
+}
+
+
+def gap_breakdown(entries):
+    """entries: dicts with key, name, accesses, features [{name, status, count}] (scanned active workbooks).
+
+    Returns (rows, milestones)."""
+    stats = {}
+    unhandled_of = {}
+    for e in entries:
+        un = set()
+        for f in e["features"]:
+            st = f.get("status")
+            if st not in ("unhandled", "manual"):
+                continue
+            k = (f.get("name") or "?", st)
+            s = stats.setdefault(k, {"wbs": set(), "occ": 0, "acc": 0, "names": []})
+            if e["key"] not in s["wbs"]:
+                s["wbs"].add(e["key"])
+                s["acc"] += e["accesses"]
+                s["names"].append(e["name"] or "")
+            s["occ"] += int(f.get("count") or 1)
+            if st == "unhandled":
+                un.add(k[0])
+        if un:
+            unhandled_of[e["key"]] = un
+    n = len(entries)
+    order = sorted(stats, key=lambda k: (k[1] != "unhandled", -len(stats[k]["wbs"]), -stats[k]["occ"], k[0]))
+    gap_total = len(unhandled_of)
+    covered, rows, rank = set(), [], 0
+    for k in order:
+        s = stats[k]
+        row = {"feature": k[0], "status": k[1], "active_workbooks": len(s["wbs"]),
+               "pct_of_scanned_active": round(100 * len(s["wbs"]) / n, 1) if n else "",
+               "occurrences": s["occ"], "active_accesses": s["acc"],
+               "example_workbooks": "; ".join(sorted(s["names"])[:5])}
+        if k[1] == "unhandled":
+            rank += 1
+            covered.add(k[0])
+            row.update(gap_rank=rank,
+                       sole_unhandled_for=sum(1 for w in s["wbs"] if unhandled_of.get(w) == {k[0]}),
+                       cum_gap_review_cleared=sum(1 for u in unhandled_of.values() if u <= covered))
+            row["cum_pct_gap_review_cleared"] = (round(100 * row["cum_gap_review_cleared"] / gap_total, 1)
+                                                 if gap_total else "")
+        rows.append(row)
+    un_rows = [r for r in rows if r["status"] == "unhandled"]
+
+    def cleared(top):
+        return un_rows[min(top, len(un_rows)) - 1]["cum_gap_review_cleared"] if un_rows else 0
+    ms = {"scanned_active": n, "gap_review_workbooks": gap_total, "unhandled_feature_types": len(un_rows),
+          "manual_feature_types": len(rows) - len(un_rows), "cleared_by_top1": cleared(1),
+          "cleared_by_top5": cleared(5), "cleared_by_top10": cleared(10),
+          "features_for_80pct_gap_review": next((r["gap_rank"] for r in un_rows
+                                                 if r["cum_pct_gap_review_cleared"] != ""
+                                                 and r["cum_pct_gap_review_cleared"] >= 80), ""),
+          "audit_unavailable_workbooks": len(stats.get((AUDIT_UNAVAILABLE, "unhandled"), {}).get("wbs", ()))}
+    return rows, ms
+
+
+def gap_entries(rows, cx, site=""):
+    return [{"key": f"{site}|{r['workbook_luid']}" if site else r["workbook_luid"], "name": r["workbook"],
+             "accesses": int(r["accesses"] or 0), "features": (cx.get(r["workbook_luid"]) or {}).get("features") or []}
+            for r in rows if r["recommended_path"] != "retire-candidate" and r["workbook_luid"] in cx]
+
+
+def write_rows_csv(path, cols, rows):
+    with open(path, "w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=cols, extrasaction="ignore", lineterminator="\n")
+        w.writeheader()
+        w.writerows(rows)
+
+
+def rebuild_gaps_all_sites(root, sites):
+    entries = []
+    for site in sites:
+        cxp, wbp = root / site / "complexity.json", root / site / "report-inventory" / "workbooks.csv"
+        if not (cxp.exists() and wbp.exists()):
+            continue
+        cx = json.loads(cxp.read_text(encoding="utf-8"))
+        with open(wbp, encoding="utf-8") as fh:
+            entries += gap_entries(list(csv.DictReader(fh)), cx, site)
+    if not entries:
+        return {}
+    rows, ms = gap_breakdown(entries)
+    write_rows_csv(root / "_server" / "gap-features-all-sites.csv", GAP_COLS, rows)
+    return ms
+
+
 def rebuild_pipeline_all_sites(root):
     """Rank tables over every full-access site's active workbooks together."""
     access = inv.site_access(root)
@@ -224,9 +335,13 @@ def rebuild_pipeline_all_sites(root):
     server = root / "_server"
     server.mkdir(parents=True, exist_ok=True)
     write_pipeline_csv(server / "pipeline-priority-all-sites.csv", rows)
-    totals = {f"pipelines|{k}": v for k, v in ms.items()}
-    (server / "pipeline-totals.json").write_text(json.dumps({"sites": sites, "totals": totals}, indent=2))
-    return ms
+    gms = rebuild_gaps_all_sites(root, sites)
+    totals = {**{f"pipelines|{k}": v for k, v in ms.items()}, **{f"gaps|{k}": v for k, v in gms.items()}}
+    (server / "step11-totals.json").write_text(json.dumps({"sites": sites, "totals": totals}, indent=2))
+    old = server / "pipeline-totals.json"  # earlier name of the same file
+    if old.exists():
+        old.unlink()
+    return {**ms, "_gaps": gms}
 
 
 def main():
@@ -473,11 +588,23 @@ def main():
               ("clustered_workbooks", summary["clustered_workbooks"], "active workbooks in a cluster")]
     inv.replace_summary_section(dest, out.name, "workbooks", srows)
     inv.replace_summary_section(dest, out.name, "pipelines", [(k, v, PIPE_HELP[k]) for k, v in ms.items()])
+    if cx:
+        gap_rows, gms = gap_breakdown(gap_entries(rows, cx))
+        write_rows_csv(dest / "gap-features.csv", GAP_COLS, gap_rows)
+        inv.replace_summary_section(dest, out.name, "gaps", [(k, v, GAP_HELP[k]) for k, v in gms.items()])
+        top = ", ".join(f"{r['feature']} ({r['active_workbooks']})" for r in gap_rows if r["status"] == "unhandled")
+        log(f"gaps: {gms['gap_review_workbooks']} gap-review workbooks, {gms['unhandled_feature_types']} unhandled "
+            f"feature types; top 5 clear {gms['cleared_by_top5']}; most common: {top[:300]}")
     all_ms = rebuild_pipeline_all_sites(out.parent)
     inv.rebuild_cross_site(out)
     log(f"pipelines: {ms['tables_to_land']} tables to land; {ms['tables_for_50pct_usage'] or '-'} unlock half the "
         f"usage of {ms['unlockable_workbooks']} unlockable workbooks, {ms['tables_for_80pct_usage'] or '-'} unlock 80%; "
         f"{ms['blocked_beyond_tables']} active workbooks also need non-table sources")
+    if all_ms.get("_gaps"):
+        g = all_ms["_gaps"]
+        log(f"all full-access sites: {g['gap_review_workbooks']} gap-review workbooks, {g['unhandled_feature_types']} "
+            f"unhandled feature types; top 5 clear {g['cleared_by_top5']}, top 10 clear {g['cleared_by_top10']} "
+            f"(output/_server/gap-features-all-sites.csv)")
     if all_ms:
         log(f"all full-access sites: {all_ms['tables_to_land']} tables to land; "
             f"{all_ms['tables_for_50pct_usage'] or '-'} for half the usage, {all_ms['tables_for_80pct_usage'] or '-'} "
