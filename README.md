@@ -19,8 +19,9 @@ APIs directly, so every step runs headless from a terminal, scheduler or CI job.
 
 | Steps | State |
 |---|---|
-| 00 connectivity, 02 usage, 03 lineage, 10 inventory, multi-site runner | **Ready.** Tested against a mock Tableau Server (including changing view counters and the one-session-per-PAT rule). Not yet run against a live server. |
-| 01, 04 to 09, 11, 12 | Port backlog, below. The ready steps do not depend on them. |
+| 00 connectivity, 02/02b usage, 03/03b lineage, 10 inventory, multi-site runner | **Ready**, and run against the client's Tableau Server. |
+| 04 workbook download, 05 complexity, 11 priority and waves, 12 consolidation | **Ready.** Tested against a mock server and Sigma's sample workbooks; not yet run on the live server. |
+| 01 inventory extras (users, extract tasks, jobs) | Backlog, below. Nothing else depends on it. |
 
 ## Tableau Server prerequisites
 
@@ -80,7 +81,8 @@ site's role in its own summary.
 
 ## Setup
 
-Requirements: Python 3.9+, standard library only. Nothing to install.
+Requirements: Python 3.9+, standard library only. Step 05 also needs **Node.js** (18 or
+later) on `PATH`, or its path in `NODE_BIN`, for the scanner's formula audit.
 
 ```bash
 cp .env.example .env    # server URL and PAT
@@ -103,7 +105,14 @@ python scripts/run_sites.py --all --steps 02,10
 
 # Or chosen sites / steps
 python scripts/run_sites.py --site finance --site ops --steps 02,03,10
+
+# Migration planning: download workbooks, score complexity, priority/waves, consolidation
+python scripts/run_sites.py --all --with-migration
 ```
+
+The runner always runs steps in pipeline order. `--with-migration` adds 04, 05, 11 and 12
+to whatever `--steps` lists. The first step 04 run downloads every workbook (no extract
+data, so it stays small); later runs fetch only workbooks republished since.
 
 Single site, step by step:
 
@@ -112,8 +121,15 @@ python scripts/check_connectivity.py     --site finance   # 00
 python scripts/fetch_view_usage.py       --site finance   # 02 (adds a usage snapshot)
 python scripts/fetch_report_lineage.py   --site finance   # 03
 python scripts/fetch_workbook_connections.py --site finance   # 03b
-python scripts/build_report_inventory.py --site finance   # 10 (always last; safe to re-run)
+python scripts/build_report_inventory.py --site finance   # 10 (safe to re-run)
+python scripts/fetch_workbooks.py        --site finance   # 04 (resumable)
+python scripts/complexity.py             --site finance   # 05 (needs Node.js)
+python scripts/workbook_priority.py      --site finance   # 11 (after 10, and 05 if run)
+python scripts/consolidation.py          --site finance   # 12 (after 04, and 11 if run)
 ```
+
+Steps 04 and 05 can run any time before 11; 11 needs step 10's `reports.csv`; 12 reads
+11's plan when it exists. Re-running step 10 keeps the summary sections that 11 and 12 add.
 
 The runner skips the rest of a site when its step 00 fails, carries on with the next site,
 and appends each site's output to `output/<site>/run.log`.
@@ -123,20 +139,102 @@ and appends each site's output to `output/<site>/run.log`.
 | # | Script | Status | Reads | Writes |
 |---|---|---|---|---|
 | 00 | `check_connectivity.py` | ready | Tableau | `connectivity.json`, `_server/sites.json` |
-| 01 | `fetch_inventory.py` | **new** (Server: port `inventory-rest.rb` and add REST users, groups, extract tasks and jobs; Cloud: the skill's Admin Insights recipes) | Tableau | `inventory.json`, `users.json`-input files |
+| 01 | `fetch_inventory.py` | backlog (users, groups, extract tasks, jobs) | Tableau | |
 | 02 | `fetch_view_usage.py` | ready | REST snapshots (Server) / Admin Insights (Cloud) | `usage-snapshots/`, `view-usage.json`, `view-usage.csv`, `raw-ts-events-per-view.json` |
 | 02b | `import_traffic_to_views.py` | ready; the runner runs it when a new export is present | `traffic-to-views/*.csv` (manual export) | `traffic-usage.json`, `.csv`, `traffic-unmatched.csv` |
 | 03 | `fetch_report_lineage.py` | ready | Metadata API | `report-lineage-raw.json` |
 | 03b | `fetch_workbook_connections.py` | ready | REST connections | `workbook-connections.json` |
-| 04 | `fetch_all_twbs.py` | port `fetch-all-twbs.rb` | REST | `twbs/<luid>.twb`, `twb-fetch-results.json` |
-| 05 | `aggregate_complexity.py` | port `aggregate-complexity.rb` | `twbs/` | `complexity.json` |
-| 06 | `build_shortlist.py` | port `build-shortlist.rb` | `inventory.json`, `complexity.json`, `view-usage.json` | `shortlist.json` |
-| 07 | `analyze_datasources.py` | port `analyze-datasources.rb` | `report-lineage-raw.json` | `data-sources.json` |
-| 08 | `migration_plan.py` | port `migration-plan.rb` | `shortlist.json`, `data-sources.json`, `report-lineage-raw.json` | `migration-plan.json` |
-| 09 | `consolidation_candidates.py` | port `consolidation-candidates.rb` | `twb-fetch-results.json`, `shortlist.json`, `complexity.json`, `migration-plan.json` | `consolidation-candidates.json` |
-| 10 | `build_report_inventory.py` | ready | everything above that exists | `report-inventory/` |
-| 11 | `analyze_users.py` | port `analyze-users.rb` (optional) | `raw-ts-users.json`, `raw-ts-events-per-user.json`, `shortlist.json` | `users.json` |
-| 12 | `render_readout.py` | port `render-readout.rb` (optional) | `inventory.json`, `complexity.json`, `shortlist.json` | `readout.md` |
+| 04 | `fetch_workbooks.py` | ready | REST | `twbs/<luid>.twb`, `twb-fetch-results.json` |
+| 05 | `complexity.py` | ready (Node.js) | `twbs/`, vendored Sigma scanner | `gaps/<luid>/`, `complexity.json`, `.csv` |
+| 10 | `build_report_inventory.py` | ready | 02 to 03b | `report-inventory/`, `_server/` rollups |
+| 11 | `workbook_priority.py` | ready | `reports.csv`, `tables.csv`, edges, `complexity.json` | `workbooks.csv`, `clusters.csv`, `pipeline-priority.csv`, `migration-plan.json`; `_server/pipeline-priority-all-sites.csv` |
+| 12 | `consolidation.py` | ready | `twbs/`, `complexity.json`, `migration-plan.json` | `consolidation-candidates.json`, `.csv`; updates `workbooks.csv` and the plan |
+
+## Migration planning (steps 04, 05, 11, 12)
+
+### Complexity (step 05)
+
+Runs Sigma's own gap scanner (vendored unchanged in `vendor/tableau-to-sigma/`, Apache 2.0)
+on every downloaded workbook. Each Tableau feature found gets a conversion tier: `auto`
+(converts), `hint` (converts, verify the formula), `manual` (hand work after publishing) or
+`unhandled` (likely lost). **Predicted parity** is the occurrence-weighted share that
+converts (auto 1.0, hint 0.85, manual 0.5, unhandled 0), banded A ≥ 90 (drop-in), B 75–90
+(light touch-up), C 50–75 (meaningful manual work), D < 50 (hard, re-author risk). It is a
+prediction from the file, not a measured result.
+
+Without Node.js the scanner counts every formula as unhandled, so parity is far too low;
+step 05 refuses to run unless `--allow-no-node` is passed, and then marks every row
+`formula_audit=unavailable`.
+
+### Priority and waves (step 11): `workbooks.csv`
+
+One row per workbook, ranked. The Sigma skill's shortlist, migration plan and datasource
+verdicts in one table:
+
+| Column | Meaning |
+|---|---|
+| `score`, `tag` | value = accesses × √users; cost = 10 × unhandled + 3 × manual + hint features; score = value ÷ (1 + cost). Tags: `retire-candidate`, `needs-gap-review` (any unhandled), `migrate-first` (score ≥ 20, no manual or unhandled), `easy-win` (≥ 10), `moderate`, `not-scanned`. |
+| `source_readiness` | Worst of its reports: `in-snowflake`, `warehouse-mapped` (traced to warehouse tables not yet in Snowflake), `needs-mapping` (database known, tables not), `needs-landing` (files, extract-only, localhost). |
+| `recommended_path` | `retire-candidate` (every data report is one), `land-data-first`, `convert-with-gap-review`, `convert`; `consolidate-into-primary` once a step 12 decision is recorded. |
+| `cluster_id` | Data-model cluster: workbooks that would share one Sigma data model. Linked first by a shared published datasource, then by warehouse-table overlap (Jaccard ≥ 0.5, `--similarity`), ignoring hub tables used by more than 5% of workbooks (`--hub-pct`, e.g. a date dimension). `clusters.csv` lists them. |
+| `suggested_wave` | A starting point for the wave plan, set per cluster from its least-ready member, since a cluster moves together: 1 in Snowflake, 2 warehouse-mapped (after its pipelines reach Snowflake), 3 needs mapping or landing, `hold` for retire candidates. |
+| `blockers` | Why it is not wave 1: unhandled or manual features, sources, a missing scan. |
+
+Waves are a proposal to take to the client with the pipeline plan, not a decision.
+
+Step 11's `workbooks` section in `summary.csv` (and the rollup) counts paths, waves and
+parity bands, and gives `avg_predicted_parity_pct` over active scanned workbooks. Across
+sites that average is weighted by each site's `parity_scanned_active`, not a plain mean of
+site averages; `unhandled_features_active` and `manual_features_active` sum the gap counts.
+
+### Pipeline priority (step 11): `pipeline-priority.csv`
+
+Which warehouse tables to land in Snowflake first. One row per table that active
+workbooks read, ranked. Tables already in Snowflake count as landed. A workbook is
+**unlocked** once every table it reads is landed and it has no other blocker (files,
+extract-only, localhost, unmapped sources; those are counted as `blocked_beyond_tables`).
+
+Ranking is greedy: each pick is the table with the most pending usage behind it, where a
+workbook's opens are shared across the tables it still waits on. A table that completes a
+fact-and-dimension set therefore follows its siblings, and a date dimension everything
+reads goes early. The cumulative columns read as "landing the first N tables unlocks X% of
+the active usage (and Y% of the workbooks) that tables alone can unlock".
+
+| Column | Meaning |
+|---|---|
+| `active_workbooks`, `active_accesses`, `sites` | Active workbooks that read the table, their opens, and how many sites they are on. |
+| `workbooks_unlocked_now` | Workbooks whose last missing table this is. |
+| `cum_pct_unlockable_accesses`, `cum_pct_unlockable_workbooks` | Running share unlocked after landing tables 1 to N. |
+| `clusters`, `example_workbooks` | Which data-model clusters and workbooks depend on it. |
+
+`output/_server/pipeline-priority-all-sites.csv` runs the same ranking over every
+full-access site together, since one table often feeds several sites. The `pipelines`
+section of `summary.csv` gives the milestones (`tables_for_50pct_usage`,
+`tables_for_80pct_usage`, and the workbook equivalents); in the rollup they come from the
+all-sites ranking, not a sum of sites.
+
+This is an anchor for the pipeline conversation, not a plan: it knows tables, not the
+Talend jobs behind them. Once the job inventory exists, rank jobs by the tables they write.
+
+### Consolidation (step 12)
+
+Finds workbooks that could become one Sigma workbook: copies that differ by a filter value,
+a year, a region or a copy/test/v2 suffix. A port of the skill's
+`consolidation-candidates.rb` with the same scoring and thresholds, and deliberately
+conservative: `consolidate` needs ≥ 70% overlap in the fields the sheets use and ≥ 60%
+sheet-set similarity for every pair; RLS differences or empty stubs force `review`. Each
+group in `consolidation-candidates.csv` carries its evidence (similarity drivers,
+differences, proposed controls).
+
+Record the client's answer per group:
+
+```bash
+python scripts/consolidation.py --site finance --decide consolidation-03=consolidate --decide consolidation-07=as-is
+```
+
+Decisions are stored in `consolidation-decisions.json` by member workbook, so they survive
+re-runs and renumbered groups, and are applied to `workbooks.csv` and `migration-plan.json`
+on every run.
 
 ## Usage on Tableau Server: snapshots (step 02)
 
@@ -191,6 +289,11 @@ default). Export it once per site:
    into the CSV, which destroys the timestamps. (If you must inspect it, open a copy.)
 4. Run `python scripts/import_traffic_to_views.py --site <site>`, then step 10.
 
+The window is the period the export covers, not the span of its events: a quiet site may
+have only a handful of opens in six months. By default it ends on the date the export file
+was saved and starts `TRAFFIC_WINDOW_DAYS` (183) earlier, or at the first event if that is
+earlier; pass `--from` and `--to` if the export covered a different range.
+
 The importer matches each row to a current view by Repository Url (the same value as the
 REST view `contentUrl`), falling back to project + workbook + view names; `--fetch-map`
 signs in once for exact URL matching if the latest snapshot predates the URL field. It
@@ -209,7 +312,7 @@ All in `output/<site>/report-inventory/`:
 
 | File | Grain | Use |
 |---|---|---|
-| `reports.csv` | one row per report | The migration inventory. A report is a dashboard, or a visible sheet that is not inside any dashboard. Carries workbook, project, owner, datasources, tables, custom SQL and extract flags, per-view usage, and (once ported) shortlist tag, predicted parity, recommended path and DM cluster. |
+| `reports.csv` | one row per report | The migration inventory. A report is a dashboard, or a visible sheet that is not inside any dashboard. Carries workbook, project, owner, datasources, tables, custom SQL and extract flags, per-view usage and retire status. Priority, parity, path, wave and cluster are per workbook, in step 11's `workbooks.csv`. |
 | `unpublished_dashboards.csv` | one row per unpublished dashboard | Dashboards the author left out when publishing (no LUID, no URL, no REST view). Not in scope, so excluded from `reports.csv`, edges and table fan-in; kept here for reference. One exception to check by hand: a dashboard hidden because it is shown inside a published story. |
 | `tables.csv` | one row per warehouse table | The dependent-models list. Report, workbook and datasource fan-in, total report accesses, and any Prep flows that read the table. |
 | `edges_report_datasource.csv` | report × datasource | Graph edges. Embedded datasources that proxy a published one carry its LUID. |
@@ -363,38 +466,35 @@ Databricks identifiers, adjust `table_key()` in `build_report_inventory.py`.
 
 ## Port backlog
 
-Recommended order. Wave 1 is everything rationalization and sequencing depend on.
+The Sigma skill's Ruby scripts were ported only where they add something here:
 
-| Wave | Script | Ruby lines | Notes |
-|---|---|---|---|
-| 1 | `fetch_inventory.py` (step 01) | 127 (`inventory-rest.rb`) | On Server, port `inventory-rest.rb` for counts and add the REST calls that cover what Admin Insights gives on Cloud: users with site role and `lastLogin`, groups, extract refresh tasks and their schedules, and recent jobs (REST job history is short, so snapshot it like usage). Add Cloud's Admin Insights recipes only if any site is on Cloud. |
-| 1 | `fetch_all_twbs.py` | 253 | Keep the upstream behaviors: resumable, `.twbx` unzip, backoff on 429/5xx, `--limit` for a sanity pass. Use a thread pool over one client; all threads share the PAT's single session. |
-| 1 | `aggregate_complexity.py` | 119 | Call the upstream **Python** scanner, `tableau-to-sigma/scripts/scan-workbook-gaps.py` (already ported upstream, Apache 2.0, with tests). Its report format may differ from what the Ruby aggregator parses, so verify against one workbook first. Needs Node.js for its formula-audit helper. |
-| 1 | `build_shortlist.py` | 136 | Small. Use per-view usage from step 02 instead of workbook totals. |
-| 1 | `analyze_datasources.py` | 320 | Retarget from `metadata-graph.json` to `report-lineage-raw.json`, which is paginated and LUID-keyed. Keep the connection-type → Sigma-readiness verdict constants. |
-| 1 | `migration_plan.py` | 317 | Replace its regex `.twb` table extraction with the lineage tables from step 03, which already include custom SQL. |
-| 1 | `consolidation_candidates.py` | 578 | The largest analytical port; it finds variant workbooks that collapse into one Sigma workbook plus a control. High value for rationalization. |
-| 2 | `analyze_users.py` | 270 | User segmentation from REST users and `lastLogin`. Per-user view history is not available from the Server APIs, so pilot coverage by user is Cloud-only unless the Traffic to Views export is used. |
-| 2 | `render_readout.py` | 313 | Markdown readout from the JSON outputs. |
+| Upstream script | Here |
+|---|---|
+| `fetch-all-twbs.rb` | step 04, `fetch_workbooks.py` |
+| `aggregate-complexity.rb` | step 05, `complexity.py`, calling the skill's Python scanner (vendored) |
+| `build-shortlist.rb`, `migration-plan.rb`, `analyze-datasources.rb` | merged into step 11, `workbook_priority.py`, using step 03's lineage instead of regex `.twb` table extraction |
+| `consolidation-candidates.rb` | step 12, `consolidation.py` (filter fields on datasources with dots in their names now resolve to captions) |
+| `inventory-rest.rb` | backlog: step 01, adding REST users with `lastLogin`, groups, extract refresh tasks and recent jobs |
 
 Not porting, with reasons:
 
 | Upstream script | Why |
 |---|---|
-| `fetch-metadata-graph.rb` | Superseded by step 03. Revisit only if you later run the `tableau-to-sigma` converter and want it to read calc formulas from this folder; that needs the `CalculatedField` fragment added to step 03. |
-| `analyze-views.rb` | Superseded by steps 02 and 10. Step 02 still writes `raw-ts-events-per-view.json` in its input shape. |
+| `fetch-metadata-graph.rb` | Superseded by step 03. |
+| `analyze-views.rb` | Superseded by steps 02, 02b and 10. |
+| `analyze-users.rb` | Needs per-user events; on Server, `traffic_top_users` from Traffic to Views covers the useful part. |
+| `render-readout.rb`, `render-readout-html.rb` | The readout is built from the CSVs and rollups (the deck). |
 | `probe-admin-insights.rb` | Folded into `TableauClient.admin_insights()` and step 00. |
 | `setup-tableau.sh`, `get-tableau-token.sh`, `bootstrap.*`, `doctor.*` | Replaced by `.env`, `lib/tableau_client.py` and step 00. |
-| `render-readout-html.rb` (1,556 lines) | Presentation only; build the client readout from the CSVs instead. |
-| `orchestrate-batch.rb` | Only useful for driving `tableau-to-sigma` agent conversions in Claude Code. |
+| `orchestrate-batch.rb`, `test-predicted-parity.rb` | Drive or test the converter agent; not part of an assessment. |
 
 ## After the inventory: rationalize and sequence
 
 Planned as step 13 (`sequence_migration.py`) once the pipeline DAG exists:
 
 1. **Rationalize.** Retire on zero usage only after owners and top users confirm. Collapse
-   consolidation candidates into one Sigma workbook plus a control. Share one Sigma data
-   model per DM cluster.
+   consolidation candidates into one Sigma workbook plus a control (step 12). Share one
+   Sigma data model per cluster (step 11).
 2. **Compute each surviving report's pipeline closure**: every job upstream of its tables.
 3. **Sequence in waves by shared closure.** Reports whose upstream pipelines are migrated or
    unaffected go first; after that, order by value relative to the new jobs each wave pulls
@@ -414,7 +514,7 @@ Planned as step 13 (`sequence_migration.py`) once the pipeline DAG exists:
 ## Versions
 
 The repo version is in `VERSION` at the root. Every script prints it on its first line
-(`tableau-assessment-py 2026.11.11; loaded config from ...`), `run.log` records it on each
+(`tableau-assessment-py 2026.11.11.1; loaded config from ...`), `run.log` records it on each
 run's header line, and `summary.csv` carries it as `code_version`, so any output can be
 traced to the code that produced it. Bump `VERSION` with each change.
 
@@ -427,10 +527,16 @@ scripts/
   lib/tableau_client.py        .env + per-site config, PAT sign-in, REST, GraphQL, VizQL Data Service
   lib/usage_queries.py         Admin Insights queries (Cloud only)
   check_connectivity.py        00
-  fetch_view_usage.py          02
-  fetch_report_lineage.py      03
+  fetch_view_usage.py / import_traffic_to_views.py      02 / 02b
+  fetch_report_lineage.py / fetch_workbook_connections.py   03 / 03b
+  fetch_workbooks.py           04
+  complexity.py                05
   build_report_inventory.py    10
+  workbook_priority.py         11
+  consolidation.py             12
+  diagnose_lineage.py          groups unresolved lineage by pattern
   run_sites.py                 multi-site runner
+vendor/tableau-to-sigma/       Sigma's gap scanner and converter helpers, unmodified (VENDORED.md)
 output/
   _server/sites.json           from step 00 --all-sites (Server Admin PATs only)
   <site>/                      one folder per site; git-ignored
@@ -439,6 +545,6 @@ output/
 
 ## Provenance
 
-Derived from `sigmacomputing/sigma-migration-skills` (Apache License 2.0). If upstream
-code is copied in during the port (for example the gap scanner), keep its license header
-and add the upstream `LICENSE` and any `NOTICE` file to this repo.
+Derived from `sigmacomputing/sigma-migration-skills` (Apache License 2.0). The gap scanner
+in `vendor/tableau-to-sigma/` is copied unmodified with its `LICENSE` and `NOTICE`;
+`VENDORED.md` records the upstream commit.

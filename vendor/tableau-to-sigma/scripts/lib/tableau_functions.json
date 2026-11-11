@@ -1,0 +1,1521 @@
+{
+  "provenance": "tflex src/utilities/TableauFunctions.json (normalized 2026-07-11); arg counts from Tableau docs",
+  "functions": [
+    {
+      "name": "DATE",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "date",
+      "sigmaEquivalent": null,
+      "notes": "Type-cast to date; Sigma Date() exists but tflex implies no mapping"
+    },
+    {
+      "name": "DATEADD",
+      "minArgs": 3,
+      "maxArgs": 3,
+      "category": "date",
+      "sigmaEquivalent": "DateAdd({0}, {1}, {2})",
+      "notes": "tflex handler ExpressionToSql.js:47 passes through verbatim; Sigma DateAdd keeps Tableau arg order (part, interval, date)"
+    },
+    {
+      "name": "DATEDIFF",
+      "minArgs": 3,
+      "maxArgs": 4,
+      "category": "date",
+      "sigmaEquivalent": "DateDiff({0}, {1}, {2})",
+      "notes": "tflex handler ExpressionToSql.js:46 emits DATEDIFF(args[0], args[2], args[1]) — swaps start/end EACH pass, and the pass count (line 156-164) equals catalog-name matches anywhere in the raw text incl. strings/brackets, so net swap depends on parity (verified: 'day'/'Date' words flip it). Ruby port: keep Tableau/Sigma order (part, start, end). Optional 4th arg start_of_week has no tflex/Sigma handling"
+    },
+    {
+      "name": "DATENAME",
+      "minArgs": 2,
+      "maxArgs": 3,
+      "category": "date",
+      "sigmaEquivalent": null,
+      "notes": "Optional 3rd arg start_of_week"
+    },
+    {
+      "name": "DATEPARSE",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "date",
+      "sigmaEquivalent": null,
+      "notes": "Sigma has DateParse but format-token dialects differ"
+    },
+    {
+      "name": "DATEPART",
+      "minArgs": 2,
+      "maxArgs": 3,
+      "category": "date",
+      "sigmaEquivalent": null,
+      "notes": "Optional 3rd arg start_of_week; Sigma DatePart"
+    },
+    {
+      "name": "DATETRUNC",
+      "minArgs": 2,
+      "maxArgs": 3,
+      "category": "date",
+      "sigmaEquivalent": null,
+      "notes": "Optional 3rd arg start_of_week; Sigma DateTrunc"
+    },
+    {
+      "name": "DAY",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "date",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "ISDATE",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "logical",
+      "sigmaEquivalent": null,
+      "notes": "Listed twice in source (lines 11 and 33, date + logical blocks)"
+    },
+    {
+      "name": "MAKEDATE",
+      "minArgs": 3,
+      "maxArgs": 3,
+      "category": "date",
+      "sigmaEquivalent": null,
+      "notes": "Sigma MakeDate"
+    },
+    {
+      "name": "MAKEDATETIME",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "date",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "MAKETIME",
+      "minArgs": 3,
+      "maxArgs": 3,
+      "category": "date",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "MAX",
+      "minArgs": 1,
+      "maxArgs": 2,
+      "category": "aggregate",
+      "sigmaEquivalent": null,
+      "notes": "Dual-role: MAX(expr) aggregate or MAX(a,b) row-level; listed twice in source (lines 15 and 35)"
+    },
+    {
+      "name": "MIN",
+      "minArgs": 1,
+      "maxArgs": 2,
+      "category": "aggregate",
+      "sigmaEquivalent": null,
+      "notes": "Dual-role: MIN(expr) aggregate or MIN(a,b) row-level; listed twice in source (lines 16 and 36)"
+    },
+    {
+      "name": "MONTH",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "date",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "NOW",
+      "minArgs": 0,
+      "maxArgs": 0,
+      "category": "date",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "QUARTER",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "date",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "TODAY",
+      "minArgs": 0,
+      "maxArgs": 0,
+      "category": "date",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "WEEK",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "date",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "YEAR",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "date",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "ISOQUARTER",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "date",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "ISOWEEK",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "date",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "ISOWEEKDAY",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "date",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "ISOYEAR",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "date",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "DATETIME",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "type_conversion",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "FLOAT",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "type_conversion",
+      "sigmaEquivalent": null,
+      "notes": "Sigma equivalent is Number()"
+    },
+    {
+      "name": "INT",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "type_conversion",
+      "sigmaEquivalent": null,
+      "notes": "Sigma Int() truncates like Tableau INT"
+    },
+    {
+      "name": "STR",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "type_conversion",
+      "sigmaEquivalent": null,
+      "notes": "Sigma equivalent is Text()"
+    },
+    {
+      "name": "IFNULL",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "logical",
+      "sigmaEquivalent": "Coalesce({0}, {1})",
+      "notes": "tflex handler ExpressionToSql.js:44 emits COALESCE(args); early-return at line 177 skips IF rewriting for ifnull-prefixed expressions"
+    },
+    {
+      "name": "IIF",
+      "minArgs": 3,
+      "maxArgs": 4,
+      "category": "logical",
+      "sigmaEquivalent": null,
+      "notes": "Optional 4th arg 'unknown' result; Sigma If(cond, then, else)"
+    },
+    {
+      "name": "ISNULL",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "logical",
+      "sigmaEquivalent": "IsNull({0})",
+      "notes": "tflex handler ExpressionToSql.js:45 emits `arg IS NULL`"
+    },
+    {
+      "name": "ZN",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "logical",
+      "sigmaEquivalent": "Zn({0})",
+      "notes": "tflex handler ExpressionToSql.js:48 emits COALESCE(arg, 0); Sigma has native Zn"
+    },
+    {
+      "name": "ATTR",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "aggregate",
+      "sigmaEquivalent": null,
+      "notes": "No Sigma equivalent; usually Min()=Max() guard or plain grouping"
+    },
+    {
+      "name": "AVG",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "aggregate",
+      "sigmaEquivalent": null,
+      "notes": "Sigma Avg"
+    },
+    {
+      "name": "COLLECT",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "aggregate",
+      "sigmaEquivalent": null,
+      "notes": "Spatial aggregate; no Sigma equivalent"
+    },
+    {
+      "name": "CORR",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "aggregate",
+      "sigmaEquivalent": null,
+      "notes": "Sigma Corr"
+    },
+    {
+      "name": "COUNT",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "aggregate",
+      "sigmaEquivalent": null,
+      "notes": "Sigma Count"
+    },
+    {
+      "name": "COUNTD",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "aggregate",
+      "sigmaEquivalent": null,
+      "notes": "Sigma CountDistinct"
+    },
+    {
+      "name": "COVAR",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "aggregate",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "COVARP",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "aggregate",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "MEDIAN",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "aggregate",
+      "sigmaEquivalent": null,
+      "notes": "Sigma Median"
+    },
+    {
+      "name": "PERCENTILE",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "aggregate",
+      "sigmaEquivalent": null,
+      "notes": "Sigma PercentileCont/PercentileDisc"
+    },
+    {
+      "name": "STDEV",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "aggregate",
+      "sigmaEquivalent": null,
+      "notes": "Sigma StdDev"
+    },
+    {
+      "name": "STDEVP",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "aggregate",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "SUM",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "aggregate",
+      "sigmaEquivalent": null,
+      "notes": "Sigma Sum"
+    },
+    {
+      "name": "VAR",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "aggregate",
+      "sigmaEquivalent": null,
+      "notes": "Sigma Variance"
+    },
+    {
+      "name": "VARP",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "aggregate",
+      "sigmaEquivalent": null,
+      "notes": "Sigma VariancePop"
+    },
+    {
+      "name": "RAWSQL_BOOL",
+      "minArgs": 1,
+      "maxArgs": null,
+      "category": "rawsql_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Variadic: SQL literal + %1..%n substitution args; route to Sigma custom-SQL element"
+    },
+    {
+      "name": "RAWSQL_DATE",
+      "minArgs": 1,
+      "maxArgs": null,
+      "category": "rawsql_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Variadic; route to Sigma custom-SQL element"
+    },
+    {
+      "name": "RAWSQL_DATETIME",
+      "minArgs": 1,
+      "maxArgs": null,
+      "category": "rawsql_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Variadic; route to Sigma custom-SQL element"
+    },
+    {
+      "name": "RAWSQL_INT",
+      "minArgs": 1,
+      "maxArgs": null,
+      "category": "rawsql_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Variadic; route to Sigma custom-SQL element"
+    },
+    {
+      "name": "RAWSQL_REAL",
+      "minArgs": 1,
+      "maxArgs": null,
+      "category": "rawsql_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Variadic; route to Sigma custom-SQL element"
+    },
+    {
+      "name": "RAWSQL_SPATIAL",
+      "minArgs": 1,
+      "maxArgs": null,
+      "category": "rawsql_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Variadic; route to Sigma custom-SQL element"
+    },
+    {
+      "name": "RAWSQL_STR",
+      "minArgs": 1,
+      "maxArgs": null,
+      "category": "rawsql_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Variadic; route to Sigma custom-SQL element"
+    },
+    {
+      "name": "RAWSQLAGG_BOOL",
+      "minArgs": 1,
+      "maxArgs": null,
+      "category": "rawsql_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Variadic aggregate passthrough"
+    },
+    {
+      "name": "RAWSQLAGG_DATE",
+      "minArgs": 1,
+      "maxArgs": null,
+      "category": "rawsql_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Variadic aggregate passthrough"
+    },
+    {
+      "name": "RAWSQLAGG_DATETIME",
+      "minArgs": 1,
+      "maxArgs": null,
+      "category": "rawsql_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Variadic aggregate passthrough"
+    },
+    {
+      "name": "RAWSQLAGG_INT",
+      "minArgs": 1,
+      "maxArgs": null,
+      "category": "rawsql_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Variadic aggregate passthrough"
+    },
+    {
+      "name": "RAWSQLAGG_REAL",
+      "minArgs": 1,
+      "maxArgs": null,
+      "category": "rawsql_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Variadic aggregate passthrough"
+    },
+    {
+      "name": "RAWSQLAGG_STR",
+      "minArgs": 1,
+      "maxArgs": null,
+      "category": "rawsql_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Variadic aggregate passthrough"
+    },
+    {
+      "name": "FULLNAME",
+      "minArgs": 0,
+      "maxArgs": 0,
+      "category": "user",
+      "sigmaEquivalent": null,
+      "notes": "Maps to Sigma CurrentUserFullName-style / user attributes"
+    },
+    {
+      "name": "ISFULLNAME",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "user",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "ISMEMBEROF",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "user",
+      "sigmaEquivalent": null,
+      "notes": "Sigma: CurrentUserInTeam"
+    },
+    {
+      "name": "ISUSERNAME",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "user",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "USERDOMAIN",
+      "minArgs": 0,
+      "maxArgs": 0,
+      "category": "user",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "USERNAME",
+      "minArgs": 0,
+      "maxArgs": 0,
+      "category": "user",
+      "sigmaEquivalent": null,
+      "notes": "Sigma: CurrentUserEmail"
+    },
+    {
+      "name": "USERATTRIBUTE",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "user",
+      "sigmaEquivalent": null,
+      "notes": "Sigma: CurrentUserAttributeText (the live function name — no bare CurrentUserAttribute exists; the converter emits CurrentUserAttributeText)"
+    },
+    {
+      "name": "USERATTRIBUTEINCLUDES",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "user",
+      "sigmaEquivalent": null,
+      "notes": "Signature per Tableau connected-apps docs; verify before relying on arg counts"
+    },
+    {
+      "name": "FIRST",
+      "minArgs": 0,
+      "maxArgs": 0,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "INDEX",
+      "minArgs": 0,
+      "maxArgs": 0,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "Sigma RowNumber over sorted grouping approximates"
+    },
+    {
+      "name": "LAST",
+      "minArgs": 0,
+      "maxArgs": 0,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "LOOKUP",
+      "minArgs": 1,
+      "maxArgs": 2,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "Sigma Lead/Lag approximate LOOKUP(expr, +/-n)"
+    },
+    {
+      "name": "MODEL_EXTENSION_BOOL",
+      "minArgs": 2,
+      "maxArgs": null,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "External model call; not portable"
+    },
+    {
+      "name": "MODEL_EXTENSION_INT",
+      "minArgs": 2,
+      "maxArgs": null,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "External model call; not portable"
+    },
+    {
+      "name": "MODEL_EXTENSION_REAL",
+      "minArgs": 2,
+      "maxArgs": null,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "External model call; not portable"
+    },
+    {
+      "name": "MODEL_EXTENSION_STR",
+      "minArgs": 2,
+      "maxArgs": null,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "External model call; not portable. Current Tableau docs spelling — kept alongside legacy MODEL_EXTENSION_STRING so modern .twb files don't bucket as unknown-function (added 2026-07-25 beyond the tflex set)"
+    },
+    {
+      "name": "MODEL_EXTENSION_STRING",
+      "minArgs": 2,
+      "maxArgs": null,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "External model call; not portable"
+    },
+    {
+      "name": "MODEL_QUANTILE",
+      "minArgs": 2,
+      "maxArgs": null,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "Predictive; not portable"
+    },
+    {
+      "name": "MODEL_PERCENTILE",
+      "minArgs": 1,
+      "maxArgs": null,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "Predictive; not portable"
+    },
+    {
+      "name": "PREVIOUS_VALUE",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "Recursive prior-row value; Lag is only a partial stand-in"
+    },
+    {
+      "name": "RANK",
+      "minArgs": 1,
+      "maxArgs": 2,
+      "category": "table_calc",
+      "sigmaEquivalent": "Rank({0}, \"desc\")",
+      "notes": "tflex window-serialization handler ExpressionToSql.js:224-227/255-258 emits RANK() OVER (...). Direction is REQUIRED in the template: Sigma Rank([column],[direction]) defaults to \"asc\" while Tableau RANK defaults descending — a bare Rank() inverts every rank (matches the converter's Rank(agg, \"desc\") emission)"
+    },
+    {
+      "name": "RANK_DENSE",
+      "minArgs": 1,
+      "maxArgs": 2,
+      "category": "table_calc",
+      "sigmaEquivalent": "RankDense()",
+      "notes": "tflex ExpressionToSql.js:231-233/262-264 emits DENSE_RANK() OVER (...)"
+    },
+    {
+      "name": "RANK_MODIFIED",
+      "minArgs": 1,
+      "maxArgs": 2,
+      "category": "table_calc",
+      "sigmaEquivalent": "Rank({0}, \"desc\")",
+      "notes": "tflex ExpressionToSql.js:228-230/259-261 approximates with plain RANK(). Direction required (Sigma default asc, Tableau default desc). VERIFY tie behavior: modified-competition ranking gives ties the LAST position in the tie block; Sigma Rank gives the first — an approximation, not an equivalent"
+    },
+    {
+      "name": "RANK_PERCENTILE",
+      "minArgs": 1,
+      "maxArgs": 2,
+      "category": "table_calc",
+      "sigmaEquivalent": "RankPercentile()",
+      "notes": "tflex ExpressionToSql.js:234-236/265-267 emits PERCENT_RANK() OVER (...)"
+    },
+    {
+      "name": "RANK_UNIQUE",
+      "minArgs": 1,
+      "maxArgs": 2,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "ROW_NUMBER semantics; no tflex handler"
+    },
+    {
+      "name": "RUNNING_AVG",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "Sigma CumulativeAvg"
+    },
+    {
+      "name": "RUNNING_COUNT",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "Sigma CumulativeCount"
+    },
+    {
+      "name": "RUNNING_MAX",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "Sigma CumulativeMax"
+    },
+    {
+      "name": "RUNNING_MIN",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "Sigma CumulativeMin"
+    },
+    {
+      "name": "RUNNING_SUM",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "Sigma CumulativeSum"
+    },
+    {
+      "name": "SIZE",
+      "minArgs": 0,
+      "maxArgs": 0,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "SCRIPT_BOOL",
+      "minArgs": 1,
+      "maxArgs": null,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "R/Python script call; not portable"
+    },
+    {
+      "name": "SCRIPT_INT",
+      "minArgs": 1,
+      "maxArgs": null,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "R/Python script call; not portable"
+    },
+    {
+      "name": "SCRIPT_REAL",
+      "minArgs": 1,
+      "maxArgs": null,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "R/Python script call; not portable"
+    },
+    {
+      "name": "SCRIPT_STR",
+      "minArgs": 1,
+      "maxArgs": null,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "R/Python script call; not portable"
+    },
+    {
+      "name": "TOTAL",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "Sigma GrandTotal/Subtotal"
+    },
+    {
+      "name": "WINDOW_AVG",
+      "minArgs": 1,
+      "maxArgs": 3,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "Optional [start,end] offsets; Sigma MovingAvg"
+    },
+    {
+      "name": "WINDOW_CORR",
+      "minArgs": 2,
+      "maxArgs": 4,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "Sigma MovingCorr"
+    },
+    {
+      "name": "WINDOW_COUNT",
+      "minArgs": 1,
+      "maxArgs": 3,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "Sigma MovingCount"
+    },
+    {
+      "name": "WINDOW_COVAR",
+      "minArgs": 2,
+      "maxArgs": 4,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "WINDOW_COVARP",
+      "minArgs": 2,
+      "maxArgs": 4,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "WINDOW_MEDIAN",
+      "minArgs": 1,
+      "maxArgs": 3,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "WINDOW_MAX",
+      "minArgs": 1,
+      "maxArgs": 3,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "Sigma MovingMax"
+    },
+    {
+      "name": "WINDOW_MIN",
+      "minArgs": 1,
+      "maxArgs": 3,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "Sigma MovingMin"
+    },
+    {
+      "name": "WINDOW_PERCENTILE",
+      "minArgs": 2,
+      "maxArgs": 4,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "WINDOW_STDEV",
+      "minArgs": 1,
+      "maxArgs": 3,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "Sigma MovingStdDev"
+    },
+    {
+      "name": "WINDOW_STDEVP",
+      "minArgs": 1,
+      "maxArgs": 3,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "WINDOW_SUM",
+      "minArgs": 1,
+      "maxArgs": 3,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "Sigma MovingSum"
+    },
+    {
+      "name": "WINDOW_VAR",
+      "minArgs": 1,
+      "maxArgs": 3,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": "Sigma MovingVariance"
+    },
+    {
+      "name": "WINDOW_VARP",
+      "minArgs": 1,
+      "maxArgs": 3,
+      "category": "table_calc",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "AREA",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "spatial",
+      "sigmaEquivalent": null,
+      "notes": "AREA(geometry, 'units'); Sigma Area"
+    },
+    {
+      "name": "BUFFER",
+      "minArgs": 3,
+      "maxArgs": 3,
+      "category": "spatial",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "DISTANCE",
+      "minArgs": 3,
+      "maxArgs": 3,
+      "category": "spatial",
+      "sigmaEquivalent": null,
+      "notes": "DISTANCE(g1, g2, 'units'); Sigma Distance"
+    },
+    {
+      "name": "INTERSECTS",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "spatial",
+      "sigmaEquivalent": null,
+      "notes": "Sigma Intersects"
+    },
+    {
+      "name": "MAKELINE",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "spatial",
+      "sigmaEquivalent": null,
+      "notes": "Sigma MakeLine"
+    },
+    {
+      "name": "MAKEPOINT",
+      "minArgs": 2,
+      "maxArgs": 3,
+      "category": "spatial",
+      "sigmaEquivalent": null,
+      "notes": "Optional SRID 3rd arg; Sigma MakePoint"
+    },
+    {
+      "name": "LENGTH",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "spatial",
+      "sigmaEquivalent": null,
+      "notes": "Spatial LENGTH(geometry, 'units') — distinct from string LEN"
+    },
+    {
+      "name": "OUTLINE",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "spatial",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "SHAPETYPE",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "spatial",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "REGEXP_MATCH",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "additional_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Sigma RegexpMatch"
+    },
+    {
+      "name": "REGEXP_EXTRACT",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "additional_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Sigma RegexpExtract"
+    },
+    {
+      "name": "REGEXP_EXTRACT_NTH",
+      "minArgs": 3,
+      "maxArgs": 3,
+      "category": "additional_passthrough",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "REGEXP_REPLACE",
+      "minArgs": 3,
+      "maxArgs": 3,
+      "category": "additional_passthrough",
+      "sigmaEquivalent": "RegexpReplace({0}, {1}, {2})",
+      "notes": "Sigma RegexpReplace, same arg order (string, pattern, replacement); converter maps it. Added 2026-07-25 beyond the tflex set — absence made scan-workbook-gaps bucket a real Tableau function as unknown/typo"
+    },
+    {
+      "name": "GET_JSON_OBJECT",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "additional_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Hive passthrough; Sigma Json"
+    },
+    {
+      "name": "PARSE_URL",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "additional_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Sigma UrlPart approximates"
+    },
+    {
+      "name": "PARSE_URL_QUERY",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "additional_passthrough",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "XPATH_BOOLEAN",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "additional_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Hadoop-only passthrough"
+    },
+    {
+      "name": "XPATH_DOUBLE",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "additional_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Hadoop-only passthrough"
+    },
+    {
+      "name": "XPATH_FLOAT",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "additional_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Hadoop-only passthrough"
+    },
+    {
+      "name": "XPATH_INT",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "additional_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Hadoop-only passthrough"
+    },
+    {
+      "name": "XPATH_LONG",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "additional_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Hadoop-only passthrough"
+    },
+    {
+      "name": "XPATH_SHORT",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "additional_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Hadoop-only passthrough"
+    },
+    {
+      "name": "XPATH_STRING",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "additional_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Hadoop-only passthrough"
+    },
+    {
+      "name": "DOMAIN",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "additional_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Google BigQuery legacy passthrough"
+    },
+    {
+      "name": "GROUP_CONCAT",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "additional_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Sigma ListAgg approximates"
+    },
+    {
+      "name": "HOST",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "additional_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "BigQuery legacy passthrough"
+    },
+    {
+      "name": "LOG2",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "additional_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "Log(x, 2) in Sigma"
+    },
+    {
+      "name": "LTRIM_THIS",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "additional_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "BigQuery legacy passthrough"
+    },
+    {
+      "name": "RTRIM_THIS",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "additional_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "BigQuery legacy passthrough"
+    },
+    {
+      "name": "TIMESTAMP_TO_USEC",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "additional_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "BigQuery legacy passthrough"
+    },
+    {
+      "name": "USEC_TO_TIMESTAMP",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "additional_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "BigQuery legacy passthrough"
+    },
+    {
+      "name": "TLD",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "additional_passthrough",
+      "sigmaEquivalent": null,
+      "notes": "BigQuery legacy passthrough"
+    },
+    {
+      "name": "ABS",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "ACOS",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "ASIN",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "ATAN",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "ATAN2",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "CEILING",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": "Sigma Ceiling"
+    },
+    {
+      "name": "COS",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "COT",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "DEGREES",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "DIV",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": "Integer division; Sigma Div"
+    },
+    {
+      "name": "EXP",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": "Listed twice in source (lines 156 and 191)"
+    },
+    {
+      "name": "FLOOR",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "HEXBINX",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": "Hex-bin helper; no Sigma equivalent"
+    },
+    {
+      "name": "HEXBINY",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": "Hex-bin helper; no Sigma equivalent"
+    },
+    {
+      "name": "LN",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "LOG",
+      "minArgs": 1,
+      "maxArgs": 2,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": "Optional base (default 10)"
+    },
+    {
+      "name": "PI",
+      "minArgs": 0,
+      "maxArgs": 0,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "POWER",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "RADIANS",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "ROUND",
+      "minArgs": 1,
+      "maxArgs": 2,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": "Optional decimals arg"
+    },
+    {
+      "name": "SIGN",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "SIN",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "SQRT",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "SQUARE",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": "Power(x, 2) in Sigma"
+    },
+    {
+      "name": "TAN",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "number",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "ASCII",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "string",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "CHAR",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "string",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "CONTAINS",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "string",
+      "sigmaEquivalent": "Contains({0}, {1})",
+      "notes": "tflex handler ExpressionToSql.js:49-52 strips double quotes from BOTH args and emits `a LIKE '%b%'`; single-quoted literals come out malformed (quotes kept)"
+    },
+    {
+      "name": "ENDSWITH",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "string",
+      "sigmaEquivalent": null,
+      "notes": "Sigma EndsWith"
+    },
+    {
+      "name": "FIND",
+      "minArgs": 2,
+      "maxArgs": 3,
+      "category": "string",
+      "sigmaEquivalent": null,
+      "notes": "Optional start position; Sigma Find"
+    },
+    {
+      "name": "FINDNTH",
+      "minArgs": 3,
+      "maxArgs": 3,
+      "category": "string",
+      "sigmaEquivalent": null,
+      "notes": null
+    },
+    {
+      "name": "LEFT",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "string",
+      "sigmaEquivalent": null,
+      "notes": "Sigma Left"
+    },
+    {
+      "name": "LEN",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "string",
+      "sigmaEquivalent": "Len({0})",
+      "notes": "tflex handler ExpressionToSql.js:43 passes through as LEN(args)"
+    },
+    {
+      "name": "LOWER",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "string",
+      "sigmaEquivalent": null,
+      "notes": "Sigma Lower"
+    },
+    {
+      "name": "LTRIM",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "string",
+      "sigmaEquivalent": null,
+      "notes": "Sigma LTrim"
+    },
+    {
+      "name": "MID",
+      "minArgs": 2,
+      "maxArgs": 3,
+      "category": "string",
+      "sigmaEquivalent": null,
+      "notes": "Optional length arg; Sigma Mid/Substring"
+    },
+    {
+      "name": "PROPER",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "string",
+      "sigmaEquivalent": null,
+      "notes": "Sigma Proper"
+    },
+    {
+      "name": "REPLACE",
+      "minArgs": 3,
+      "maxArgs": 3,
+      "category": "string",
+      "sigmaEquivalent": null,
+      "notes": "Sigma Replace"
+    },
+    {
+      "name": "RIGHT",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "string",
+      "sigmaEquivalent": "Right({0}, {1})",
+      "notes": "tflex handler ExpressionToSql.js:42 passes through as RIGHT(args)"
+    },
+    {
+      "name": "RTRIM",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "string",
+      "sigmaEquivalent": null,
+      "notes": "Sigma RTrim"
+    },
+    {
+      "name": "SPACE",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "string",
+      "sigmaEquivalent": null,
+      "notes": "Repeat(' ', n) in Sigma"
+    },
+    {
+      "name": "SPLIT",
+      "minArgs": 3,
+      "maxArgs": 3,
+      "category": "string",
+      "sigmaEquivalent": "SplitPart({0}, {1}, {2})",
+      "notes": "tflex handler ExpressionToSql.js:54-80 expands to SUBSTRING/CHARINDEX chains (REVERSE-wrapped for negative n, error on n=0); Sigma SplitPart takes the token index directly and supports negative n on Snowflake"
+    },
+    {
+      "name": "STARTSWITH",
+      "minArgs": 2,
+      "maxArgs": 2,
+      "category": "string",
+      "sigmaEquivalent": null,
+      "notes": "Sigma StartsWith"
+    },
+    {
+      "name": "TRIM",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "string",
+      "sigmaEquivalent": "Trim({0})",
+      "notes": "tflex handler ExpressionToSql.js:53 emits LTRIM(RTRIM(arg))"
+    },
+    {
+      "name": "UPPER",
+      "minArgs": 1,
+      "maxArgs": 1,
+      "category": "string",
+      "sigmaEquivalent": null,
+      "notes": "Sigma Upper"
+    }
+  ],
+  "keywords": {
+    "logicals": [
+      "AND",
+      "OR",
+      "NOT",
+      "IF",
+      "CASE",
+      "WHEN",
+      "THEN",
+      "ELSE",
+      "END",
+      "IN",
+      "ELSEIF"
+    ],
+    "lod": [
+      "FIXED",
+      "INCLUDE",
+      "EXCLUDE"
+    ]
+  }
+}

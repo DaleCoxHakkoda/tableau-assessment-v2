@@ -805,13 +805,46 @@ def write_summary(out_dir, dest, reports, unpublished, datasources, custom_sql, 
     if raw.get("errors"):
         add("site", "fetch_errors", ", ".join(raw["errors"]), "see report-lineage-raw.json")
 
-    cols = ["site", "section", "metric", "value", "description"]
+    # Sections written by later steps (11, 12) survive a re-run of this step.
+    later = []
+    if (dest / "summary.csv").exists():
+        with open(dest / "summary.csv", encoding="utf-8") as fh:
+            later = [r for r in csv.DictReader(fh) if r["section"] in LATER_SECTIONS]
+    write_summary_rows(dest, rows + later)
+    rebuild_cross_site(out_dir)
+
+
+SUMMARY_COLS = ["site", "section", "metric", "value", "description"]
+SECTION_ORDER = ["site", "inventory", "datasources", "lineage", "source_types", "source_hosts",
+                 "usage_snapshots", "usage_traffic", "retire", "workbooks", "pipelines", "consolidation"]
+LATER_SECTIONS = {"workbooks", "pipelines", "consolidation"}
+
+
+def write_summary_rows(dest, rows):
+    rows = sorted(rows, key=lambda r: SECTION_ORDER.index(r["section"]) if r["section"] in SECTION_ORDER
+                  else len(SECTION_ORDER))  # stable: keeps metric order within a section
     with open(dest / "summary.csv", "w", newline="", encoding="utf-8") as fh:
-        wr = csv.DictWriter(fh, fieldnames=cols, lineterminator="\n")
+        wr = csv.DictWriter(fh, fieldnames=SUMMARY_COLS, lineterminator="\n")
         wr.writeheader()
         wr.writerows(rows)
 
-    # Cross-site rollup from every sibling site folder's summary.csv.
+
+def replace_summary_section(dest, site, section, metrics):
+    """Replace one section of a site's summary.csv with (metric, value, description) rows."""
+    path = dest / "summary.csv"
+    if not path.exists():
+        raise SystemExit(f"missing {path}; run step 10 first")
+    with open(path, encoding="utf-8") as fh:
+        rows = [r for r in csv.DictReader(fh) if r["section"] != section]
+    rows += [{"site": site, "section": section, "metric": m, "value": "" if v is None else v, "description": d}
+             for m, v, d in metrics]
+    write_summary_rows(dest, rows)
+
+
+def rebuild_cross_site(out_dir):
+    """Rebuild output/_server/ rollups from every sibling site folder's summary.csv."""
+    out_dir = Path(out_dir)
+    cols = SUMMARY_COLS
     root = out_dir.parent
     stacked, order, sites = [], [], []
     for p in sorted(root.glob("*/report-inventory/summary.csv")):
@@ -826,6 +859,8 @@ def write_summary(out_dir, dest, reports, unpublished, datasources, custom_sql, 
     if not stacked:
         return
     stacked, order = merge_host_rows(stacked)
+    sections = SECTION_ORDER
+    order.sort(key=lambda k: sections.index(k[0]) if k[0] in sections else len(sections))
     if ("source_types", "distinct_types") not in order and any(k[0] == "source_types" for k in order):
         order.insert(next(i for i, k in enumerate(order) if k[0] == "source_types"), ("source_types", "distinct_types"))
     val = {(r["section"], r["metric"], r["site"]): r["value"] for r in stacked}
@@ -838,6 +873,18 @@ def write_summary(out_dir, dest, reports, unpublished, datasources, custom_sql, 
     in_total = [s for s in sites if access.get(s, {}).get("access", "FULL") == "FULL"]
     excluded = [s for s in sites if s not in in_total]
     totals, how = rollup_totals(root, order, in_total, val)
+    # Pipeline counts share tables across sites, so step 11 computes them over all sites together.
+    pt = root / "_server" / "pipeline-totals.json"
+    if pt.exists():
+        try:
+            ptj = json.loads(pt.read_text(encoding="utf-8"))
+        except ValueError:
+            ptj = {}
+        for k, v in (ptj.get("totals") or {}).items():
+            key = tuple(k.split("|", 1))
+            if key in totals:
+                totals[key] = v
+                how[key] = f"computed across {len(ptj.get('sites') or [])} site(s) together (step 11)"
     coverage = coverage_rows(access, in_total, excluded)
 
     server = root / "_server"
@@ -879,7 +926,7 @@ def write_summary(out_dir, dest, reports, unpublished, datasources, custom_sql, 
             keys.sort(key=lambda k: -(_num(totals[k]) or 0))
             for k in keys:
                 wr.writerow([kind, k[1], totals[k]] + [val.get((k[0], k[1], s), "") for s in in_total])
-    log(f"Summary: {dest / 'summary.csv'}; rollup across {len(in_total)} site(s): {server / 'summary-rollup.csv'} "
+    log(f"Summary: {out_dir / 'report-inventory' / 'summary.csv'}; rollup across {len(in_total)} site(s): {server / 'summary-rollup.csv'} "
         f"(source types and hosts: summary-sources.csv)")
     cov = {m: v for m, v, _, _ in coverage}
     if cov.get("sites_pending_access"):
@@ -919,6 +966,8 @@ PER_SITE_ONLY = {("site", "generated_at"), ("site", "site_role"), ("site", "fetc
                  ("usage_snapshots", "source"), ("usage_snapshots", "snapshots"),
                  ("usage_snapshots", "window_days"), ("usage_traffic", "window_days")}
 EARLIEST = {("usage_traffic", "window_start")}
+# Averages: combined across sites weighted by the count each one is taken over.
+WEIGHTED_AVG = {("workbooks", "avg_predicted_parity_pct"): ("workbooks", "parity_scanned_active")}
 LATEST = {("usage_traffic", "window_end"), ("site", "code_version")}
 
 
@@ -1005,6 +1054,14 @@ def rollup_totals(root, order, sites, val):
             types = {met for sec, met in order if sec == "source_types" and met != "distinct_types"
                      and any(val.get((sec, met, s)) not in (None, "") for s in sites)}
             totals[key], how[key] = len(types), "distinct across sites"
+        elif key in WEIGHTED_AVG:
+            wkey = WEIGHTED_AVG[key]
+            pairs = [(_num(val.get((key[0], key[1], s))), _num(val.get((wkey[0], wkey[1], s)))) for s in sites]
+            pairs = [(v, w) for v, w in pairs if v is not None and w]
+            n = sum(w for _, w in pairs)
+            totals[key] = round(sum(v * w for v, w in pairs) / n, 1) if n else ""
+            how[key] = f"average weighted by {wkey[1]}" + (f" ({len(pairs)} of {len(sites)} sites)"
+                                                           if len(pairs) < len(sites) else "")
         elif key in PER_SITE_ONLY:
             totals[key], how[key] = "", "per-site only"
         elif key in EARLIEST:

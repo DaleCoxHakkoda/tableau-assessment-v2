@@ -39,6 +39,7 @@ import os
 import re
 import ssl
 import sys
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -185,6 +186,11 @@ class TableauClient:
         self.product_version = None
         self.token = self.site_id = self.user_id = None
         self._signed_in_here = False
+        # Several threads may share this client (and so the PAT's one session). Re-auth is
+        # serialized so one thread signs in again while the others wait and reuse its token.
+        self._auth_lock = threading.Lock()
+        self._can_reauth = False
+        self._reauth_failed = False
 
     def __enter__(self):
         self.sign_in()
@@ -216,18 +222,32 @@ class TableauClient:
             return raw
         return json.loads(raw) if raw else {}
 
-    def request(self, method, path, body=None, retries=3):
-        """Authenticated call with one re-auth on expiry and backoff on 429/5xx/network errors."""
+    def request(self, method, path, body=None, retries=3, accept="application/json"):
+        """Authenticated call with one re-auth on expiry and backoff on 429/5xx/network errors.
+
+        Thread-safe: when several threads hit an expired session at once, exactly one signs
+        in again and the rest reuse its new token. A failed re-auth is never retried by
+        another thread (consecutive failed sign-ins lock the PAT).
+        """
         url = path if path.startswith("http") else f"{self.server}{path}"
         reauthed = False
         for attempt in range(retries + 1):
+            used = self.token
             try:
-                return self._http(method, url, body)
+                return self._http(method, url, body, accept=accept)
             except HTTPStatusError as e:
-                if e.status == 401 and self._signed_in_here and not reauthed:
-                    log("Session ended (expired, or this PAT signed in elsewhere); signing in again")
-                    self._signed_in_here, self.token = False, None
-                    self.sign_in()
+                if e.status == 401 and self._can_reauth and not reauthed:
+                    with self._auth_lock:
+                        if self._reauth_failed:
+                            raise
+                        if self.token == used:  # nobody has refreshed it since this call began
+                            log("Session ended (expired, or this PAT signed in elsewhere); signing in again")
+                            self._signed_in_here, self.token = False, None
+                            try:
+                                self.sign_in()
+                            except Exception:
+                                self._reauth_failed = True
+                                raise
                     reauthed = True
                     continue
                 if e.status in (429, 502, 503, 504) and attempt < retries:
@@ -278,6 +298,7 @@ class TableauClient:
         self.token, self.site_id = c["token"], c["site"]["id"]
         self.user_id = (c.get("user") or {}).get("id")
         self._signed_in_here = True
+        self._can_reauth = True
 
     def sign_out(self):
         if not self._signed_in_here:
@@ -287,6 +308,10 @@ class TableauClient:
         except Exception:  # noqa: BLE001
             pass
         self._signed_in_here = False
+
+    def request_bytes(self, method, path):
+        """Like request(), for binary responses (e.g. a workbook download)."""
+        return self.request(method, path, accept="*/*")
 
     # -- REST helpers
     def rest(self, method, path, body=None):

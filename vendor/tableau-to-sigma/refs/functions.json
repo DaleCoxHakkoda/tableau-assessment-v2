@@ -1,0 +1,2385 @@
+{
+ "_generated": {
+  "by": "scripts/dev/gen-translation-table.mjs",
+  "note": "BUILD ARTIFACT — regenerate with `node scripts/dev/gen-translation-table.mjs`; never hand-edit. One row per live-catalog function; sigma_template is the translator's real output for the recorded probe.",
+  "inputs": {
+   "bundle": "converter/tableau.mjs",
+   "bundle_sha256": "30f4f80dce2bd3ae51f93918ab7d7b5ed10c9e141401e580a91429fa0d100c67",
+   "catalog": "scripts/lib/tableau_functions.json",
+   "catalog_sha256": "be92f472fae64fe8df5ca5028dd7655adc9fb9a3dc494656541bd7f23f420571"
+  },
+  "statuses": [
+   "spec",
+   "verify",
+   "chart_only",
+   "rls",
+   "not_converted",
+   "unmapped"
+  ],
+  "map_not_in_catalog": [
+   "HOUR",
+   "MINUTE",
+   "MOD",
+   "SECOND"
+  ]
+ },
+ "counts": {
+  "chart_only": 19,
+  "not_converted": 14,
+  "rls": 4,
+  "spec": 78,
+  "unmapped": 71,
+  "verify": 1
+ },
+ "functions": [
+  {
+   "tableau_fn": "ABS",
+   "category": "number",
+   "probe": "ABS([NUM_A])",
+   "sigma_template": "Abs([Num a])",
+   "sigma_functions": [
+    "Abs"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "ACOS",
+   "category": "number",
+   "probe": "ACOS([NUM_A])",
+   "sigma_template": "Acos([Num a])",
+   "sigma_functions": [
+    "Acos"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "AREA",
+   "category": "spatial",
+   "probe": "AREA([TXT_A], [TXT_B])",
+   "sigma_template": "AREA([Txt a], [Txt B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "ASCII",
+   "category": "string",
+   "probe": "ASCII([TXT_A])",
+   "sigma_template": "ASCII([Txt a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "ASIN",
+   "category": "number",
+   "probe": "ASIN([NUM_A])",
+   "sigma_template": "Asin([Num a])",
+   "sigma_functions": [
+    "Asin"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "ATAN",
+   "category": "number",
+   "probe": "ATAN([NUM_A])",
+   "sigma_template": "Atan([Num a])",
+   "sigma_functions": [
+    "Atan"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "ATAN2",
+   "category": "number",
+   "probe": "ATAN2([NUM_A], [NUM_B])",
+   "sigma_template": "Atan2([Num a], [Num B])",
+   "sigma_functions": [
+    "Atan2"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "ATTR",
+   "category": "aggregate",
+   "probe": "ATTR([TXT_A])",
+   "sigma_template": "[Txt a]",
+   "sigma_functions": [],
+   "arg_transform": "rewrite",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "AVG",
+   "category": "aggregate",
+   "probe": "AVG([NUM_A])",
+   "sigma_template": "Avg([Num a])",
+   "sigma_functions": [
+    "Avg"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "BUFFER",
+   "category": "spatial",
+   "probe": "BUFFER([TXT_A], [TXT_B], [TXT_C])",
+   "sigma_template": "BUFFER([Txt a], [Txt B], [Txt C])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "CEILING",
+   "category": "number",
+   "probe": "CEILING([NUM_A])",
+   "sigma_template": "Ceiling([Num a])",
+   "sigma_functions": [
+    "Ceiling"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "CHAR",
+   "category": "string",
+   "probe": "CHAR([TXT_A])",
+   "sigma_template": "CHAR([Txt a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "COLLECT",
+   "category": "aggregate",
+   "probe": "COLLECT([NUM_A])",
+   "sigma_template": "COLLECT([Num a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "CONTAINS",
+   "category": "string",
+   "probe": "CONTAINS([TXT_A], '-')",
+   "sigma_template": "Contains([Txt a], \"-\")",
+   "sigma_functions": [
+    "Contains"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "CORR",
+   "category": "aggregate",
+   "probe": "CORR([NUM_A], [NUM_B])",
+   "sigma_template": "Corr([Num a], [Num B])",
+   "sigma_functions": [
+    "Corr"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "COS",
+   "category": "number",
+   "probe": "COS([NUM_A])",
+   "sigma_template": "Cos([Num a])",
+   "sigma_functions": [
+    "Cos"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "COT",
+   "category": "number",
+   "probe": "COT([NUM_A])",
+   "sigma_template": "Cot([Num a])",
+   "sigma_functions": [
+    "Cot"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "COUNT",
+   "category": "aggregate",
+   "probe": "COUNT([TXT_A])",
+   "sigma_template": "CountIf(IsNotNull([Txt a]))",
+   "sigma_functions": [
+    "CountIf",
+    "IsNotNull"
+   ],
+   "arg_transform": "rewrite",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "COUNTD",
+   "category": "aggregate",
+   "probe": "COUNTD([TXT_A])",
+   "sigma_template": "CountDistinct([Txt a])",
+   "sigma_functions": [
+    "CountDistinct"
+   ],
+   "arg_transform": "rewrite",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "COVAR",
+   "category": "aggregate",
+   "probe": "COVAR([NUM_A], [NUM_B])",
+   "sigma_template": "/* no Sigma equivalent: COVAR([NUM_A], [NUM_B]) */",
+   "sigma_functions": [],
+   "arg_transform": "none",
+   "context": "none",
+   "verify_flags": [
+    "⚠ COVAR/COVARP has no Sigma equivalent — not converted. Fragment: COVAR([NUM_A], [NUM_B])"
+   ],
+   "status": "not_converted"
+  },
+  {
+   "tableau_fn": "COVARP",
+   "category": "aggregate",
+   "probe": "COVARP([NUM_A], [NUM_B])",
+   "sigma_template": "/* no Sigma equivalent: COVARP([NUM_A], [NUM_B]) */",
+   "sigma_functions": [],
+   "arg_transform": "none",
+   "context": "none",
+   "verify_flags": [
+    "⚠ COVAR/COVARP has no Sigma equivalent — not converted. Fragment: COVARP([NUM_A], [NUM_B])"
+   ],
+   "status": "not_converted"
+  },
+  {
+   "tableau_fn": "DATE",
+   "category": "date",
+   "probe": "DATE([DATE_A])",
+   "sigma_template": "Date([Date a])",
+   "sigma_functions": [
+    "Date"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "DATEADD",
+   "category": "date",
+   "probe": "DATEADD('day', 7, [DATE_A])",
+   "sigma_template": "DateAdd(\"day\", 7, [Date a])",
+   "sigma_functions": [
+    "DateAdd"
+   ],
+   "arg_transform": "rewrite",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "DATEDIFF",
+   "category": "date",
+   "probe": "DATEDIFF('day', [DATE_A], [DATE_B])",
+   "sigma_template": "DateDiff(\"day\", [Date a], [Date B])",
+   "sigma_functions": [
+    "DateDiff"
+   ],
+   "arg_transform": "rewrite",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "DATENAME",
+   "category": "date",
+   "probe": "DATENAME('month', [DATE_A])",
+   "sigma_template": "MonthName([Date a])",
+   "sigma_functions": [
+    "MonthName"
+   ],
+   "arg_transform": "rewrite",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "DATEPARSE",
+   "category": "date",
+   "probe": "DATEPARSE('yyyy-MM-dd', [TXT_A])",
+   "sigma_template": "DateParse([Txt a], \"%Y-%m-%d\")",
+   "sigma_functions": [
+    "DateParse"
+   ],
+   "arg_transform": "rewrite",
+   "context": "spec",
+   "verify_flags": [
+    "⚠ DATEPARSE format translated to strftime tokens — verify the pattern resolves on your warehouse."
+   ],
+   "status": "verify"
+  },
+  {
+   "tableau_fn": "DATEPART",
+   "category": "date",
+   "probe": "DATEPART('year', [DATE_A])",
+   "sigma_template": "Year([Date a])",
+   "sigma_functions": [
+    "Year"
+   ],
+   "arg_transform": "rewrite",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "DATETIME",
+   "category": "type_conversion",
+   "probe": "DATETIME([TXT_A])",
+   "sigma_template": "Date([Txt a])",
+   "sigma_functions": [
+    "Date"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "DATETRUNC",
+   "category": "date",
+   "probe": "DATETRUNC('month', [DATE_A])",
+   "sigma_template": "DateTrunc(\"month\", [Date a])",
+   "sigma_functions": [
+    "DateTrunc"
+   ],
+   "arg_transform": "rewrite",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "DAY",
+   "category": "date",
+   "probe": "DAY([DATE_A])",
+   "sigma_template": "Day([Date a])",
+   "sigma_functions": [
+    "Day"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "DEGREES",
+   "category": "number",
+   "probe": "DEGREES([NUM_A])",
+   "sigma_template": "Degrees([Num a])",
+   "sigma_functions": [
+    "Degrees"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "DISTANCE",
+   "category": "spatial",
+   "probe": "DISTANCE([TXT_A], [TXT_B], [TXT_C])",
+   "sigma_template": "DISTANCE([Txt a], [Txt B], [Txt C])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "DIV",
+   "category": "number",
+   "probe": "DIV([NUM_A], [NUM_B])",
+   "sigma_template": "DIV([Num a], [Num B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "DOMAIN",
+   "category": "additional_passthrough",
+   "probe": "DOMAIN([TXT_A])",
+   "sigma_template": "DOMAIN([Txt a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "ENDSWITH",
+   "category": "string",
+   "probe": "ENDSWITH([TXT_A], '-')",
+   "sigma_template": "EndsWith([Txt a], \"-\")",
+   "sigma_functions": [
+    "EndsWith"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "EXP",
+   "category": "number",
+   "probe": "EXP([NUM_A])",
+   "sigma_template": "Exp([Num a])",
+   "sigma_functions": [
+    "Exp"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "FIND",
+   "category": "string",
+   "probe": "FIND([TXT_A], '-')",
+   "sigma_template": "Find([Txt a], \"-\")",
+   "sigma_functions": [
+    "Find"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "FINDNTH",
+   "category": "string",
+   "probe": "FINDNTH([TXT_A], '-', 2)",
+   "sigma_template": "FINDNTH([Txt a], \"-\", 2)",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "FIRST",
+   "category": "table_calc",
+   "probe": "FIRST()",
+   "sigma_template": "/* table calc: FIRST() */",
+   "sigma_functions": [],
+   "arg_transform": "none",
+   "context": "none",
+   "verify_flags": [
+    "⚠ Table calculation not converted. Untranslated fragment: FIRST()"
+   ],
+   "status": "not_converted"
+  },
+  {
+   "tableau_fn": "FLOAT",
+   "category": "type_conversion",
+   "probe": "FLOAT([TXT_A])",
+   "sigma_template": "Number([Txt a])",
+   "sigma_functions": [
+    "Number"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "FLOOR",
+   "category": "number",
+   "probe": "FLOOR([NUM_A])",
+   "sigma_template": "Floor([Num a])",
+   "sigma_functions": [
+    "Floor"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "FULLNAME",
+   "category": "user",
+   "probe": "FULLNAME()",
+   "sigma_template": "FULLNAME()",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "GET_JSON_OBJECT",
+   "category": "additional_passthrough",
+   "probe": "GET_JSON_OBJECT([TXT_A], [TXT_B])",
+   "sigma_template": "GET_JSON_OBJECT([Txt a], [Txt B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "GROUP_CONCAT",
+   "category": "additional_passthrough",
+   "probe": "GROUP_CONCAT([TXT_A])",
+   "sigma_template": "GROUP_CONCAT([Txt a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "HEXBINX",
+   "category": "number",
+   "probe": "HEXBINX([NUM_A], [NUM_B])",
+   "sigma_template": "HEXBINX([Num a], [Num B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "HEXBINY",
+   "category": "number",
+   "probe": "HEXBINY([NUM_A], [NUM_B])",
+   "sigma_template": "HEXBINY([Num a], [Num B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "HOST",
+   "category": "additional_passthrough",
+   "probe": "HOST([TXT_A])",
+   "sigma_template": "HOST([Txt a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "IFNULL",
+   "category": "logical",
+   "probe": "IFNULL([NUM_A], 0)",
+   "sigma_template": "Coalesce([Num a], 0)",
+   "sigma_functions": [
+    "Coalesce"
+   ],
+   "arg_transform": "rewrite",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "IIF",
+   "category": "logical",
+   "probe": "IIF([FLAG_A], 1, 0)",
+   "sigma_template": "If([Flag a], 1, 0)",
+   "sigma_functions": [
+    "If"
+   ],
+   "arg_transform": "rewrite",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "INDEX",
+   "category": "table_calc",
+   "probe": "INDEX()",
+   "sigma_template": "RowNumber()",
+   "sigma_functions": [
+    "RowNumber"
+   ],
+   "arg_transform": "rewrite",
+   "context": "chart",
+   "verify_flags": [
+    "ℹ Table calc → RowNumber() — CHART/grouped-element context ONLY: place in a grouped workbook element (group by the viz dimensions); window functions silently er"
+   ],
+   "status": "chart_only"
+  },
+  {
+   "tableau_fn": "INT",
+   "category": "type_conversion",
+   "probe": "INT([TXT_A])",
+   "sigma_template": "Int([Txt a])",
+   "sigma_functions": [
+    "Int"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "INTERSECTS",
+   "category": "spatial",
+   "probe": "INTERSECTS([TXT_A], [TXT_B])",
+   "sigma_template": "INTERSECTS([Txt a], [Txt B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "ISDATE",
+   "category": "logical",
+   "probe": "ISDATE([TXT_A])",
+   "sigma_template": "ISDATE([Txt a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "ISFULLNAME",
+   "category": "user",
+   "probe": "ISFULLNAME([TXT_A])",
+   "sigma_template": "ISFULLNAME([Txt a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "ISMEMBEROF",
+   "category": "user",
+   "probe": "ISMEMBEROF('group')",
+   "sigma_template": "CurrentUserInTeam(\"group\")",
+   "sigma_functions": [
+    "CurrentUserInTeam"
+   ],
+   "arg_transform": "rewrite",
+   "context": "rls",
+   "verify_flags": [],
+   "status": "rls"
+  },
+  {
+   "tableau_fn": "ISNULL",
+   "category": "logical",
+   "probe": "ISNULL([NUM_A])",
+   "sigma_template": "IsNull([Num a])",
+   "sigma_functions": [
+    "IsNull"
+   ],
+   "arg_transform": "rewrite",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "ISOQUARTER",
+   "category": "date",
+   "probe": "ISOQUARTER([DATE_A])",
+   "sigma_template": "ISOQUARTER([Date a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "ISOWEEK",
+   "category": "date",
+   "probe": "ISOWEEK([DATE_A])",
+   "sigma_template": "ISOWEEK([Date a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "ISOWEEKDAY",
+   "category": "date",
+   "probe": "ISOWEEKDAY([DATE_A])",
+   "sigma_template": "ISOWEEKDAY([Date a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "ISOYEAR",
+   "category": "date",
+   "probe": "ISOYEAR([DATE_A])",
+   "sigma_template": "ISOYEAR([Date a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "ISUSERNAME",
+   "category": "user",
+   "probe": "ISUSERNAME('user')",
+   "sigma_template": "(CurrentUserEmail() = \"user\")",
+   "sigma_functions": [
+    "CurrentUserEmail"
+   ],
+   "arg_transform": "rewrite",
+   "context": "rls",
+   "verify_flags": [],
+   "status": "rls"
+  },
+  {
+   "tableau_fn": "LAST",
+   "category": "table_calc",
+   "probe": "LAST()",
+   "sigma_template": "/* table calc: LAST() */",
+   "sigma_functions": [],
+   "arg_transform": "none",
+   "context": "none",
+   "verify_flags": [
+    "⚠ Table calculation not converted. Untranslated fragment: LAST()"
+   ],
+   "status": "not_converted"
+  },
+  {
+   "tableau_fn": "LEFT",
+   "category": "string",
+   "probe": "LEFT([TXT_A], 3)",
+   "sigma_template": "Left([Txt a], 3)",
+   "sigma_functions": [
+    "Left"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "LEN",
+   "category": "string",
+   "probe": "LEN([TXT_A])",
+   "sigma_template": "Len([Txt a])",
+   "sigma_functions": [
+    "Len"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "LENGTH",
+   "category": "spatial",
+   "probe": "LENGTH([TXT_A], [TXT_B])",
+   "sigma_template": "LENGTH([Txt a], [Txt B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "LN",
+   "category": "number",
+   "probe": "LN([NUM_A])",
+   "sigma_template": "Ln([Num a])",
+   "sigma_functions": [
+    "Ln"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "LOG",
+   "category": "number",
+   "probe": "LOG([NUM_A])",
+   "sigma_template": "Log([Num a])",
+   "sigma_functions": [
+    "Log"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "LOG2",
+   "category": "additional_passthrough",
+   "probe": "LOG2([TXT_A])",
+   "sigma_template": "LOG2([Txt a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "LOOKUP",
+   "category": "table_calc",
+   "probe": "LOOKUP(SUM([NUM_A]), -1)",
+   "sigma_template": "Lag(Sum([Num a]), 1)",
+   "sigma_functions": [
+    "Lag",
+    "Sum"
+   ],
+   "arg_transform": "rewrite",
+   "context": "chart",
+   "verify_flags": [
+    "ℹ Table calc → Lag(Sum([Num a]), 1) — CHART/grouped-element context ONLY: place in a grouped workbook element (group by the viz dimensions); window functions si"
+   ],
+   "status": "chart_only"
+  },
+  {
+   "tableau_fn": "LOWER",
+   "category": "string",
+   "probe": "LOWER([TXT_A])",
+   "sigma_template": "Lower([Txt a])",
+   "sigma_functions": [
+    "Lower"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "LTRIM",
+   "category": "string",
+   "probe": "LTRIM([TXT_A])",
+   "sigma_template": "Ltrim([Txt a])",
+   "sigma_functions": [
+    "Ltrim"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "LTRIM_THIS",
+   "category": "additional_passthrough",
+   "probe": "LTRIM_THIS([TXT_A], [TXT_B])",
+   "sigma_template": "LTRIM_THIS([Txt a], [Txt B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "MAKEDATE",
+   "category": "date",
+   "probe": "MAKEDATE(2024, 1, 15)",
+   "sigma_template": "MakeDate(2024, 1, 15)",
+   "sigma_functions": [
+    "MakeDate"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "MAKEDATETIME",
+   "category": "date",
+   "probe": "MAKEDATETIME([DATE_A], [DATE_B])",
+   "sigma_template": "MAKEDATETIME([Date a], [Date B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "MAKELINE",
+   "category": "spatial",
+   "probe": "MAKELINE([TXT_A], [TXT_B])",
+   "sigma_template": "MAKELINE([Txt a], [Txt B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "MAKEPOINT",
+   "category": "spatial",
+   "probe": "MAKEPOINT([TXT_A], [TXT_B])",
+   "sigma_template": "MAKEPOINT([Txt a], [Txt B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "MAKETIME",
+   "category": "date",
+   "probe": "MAKETIME(12, 30, 0)",
+   "sigma_template": "MAKETIME(12, 30, 0)",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "MAX",
+   "category": "aggregate",
+   "probe": "MAX([NUM_A])",
+   "sigma_template": "Max([Num a])",
+   "sigma_functions": [
+    "Max"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "MEDIAN",
+   "category": "aggregate",
+   "probe": "MEDIAN([NUM_A])",
+   "sigma_template": "Median([Num a])",
+   "sigma_functions": [
+    "Median"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "MID",
+   "category": "string",
+   "probe": "MID([TXT_A], 2, 3)",
+   "sigma_template": "Mid([Txt a], 2, 3)",
+   "sigma_functions": [
+    "Mid"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "MIN",
+   "category": "aggregate",
+   "probe": "MIN([NUM_A])",
+   "sigma_template": "Min([Num a])",
+   "sigma_functions": [
+    "Min"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "MODEL_EXTENSION_BOOL",
+   "category": "table_calc",
+   "probe": "MODEL_EXTENSION_BOOL([TXT_A], [TXT_B])",
+   "sigma_template": "MODEL_EXTENSION_BOOL([Txt a], [Txt B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "MODEL_EXTENSION_INT",
+   "category": "table_calc",
+   "probe": "MODEL_EXTENSION_INT([TXT_A], [TXT_B])",
+   "sigma_template": "MODEL_EXTENSION_INT([Txt a], [Txt B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "MODEL_EXTENSION_REAL",
+   "category": "table_calc",
+   "probe": "MODEL_EXTENSION_REAL([TXT_A], [TXT_B])",
+   "sigma_template": "MODEL_EXTENSION_REAL([Txt a], [Txt B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "MODEL_EXTENSION_STR",
+   "category": "table_calc",
+   "probe": "MODEL_EXTENSION_STR([TXT_A], [TXT_B])",
+   "sigma_template": "MODEL_EXTENSION_STR([Txt a], [Txt B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "MODEL_EXTENSION_STRING",
+   "category": "table_calc",
+   "probe": "MODEL_EXTENSION_STRING([TXT_A], [TXT_B])",
+   "sigma_template": "MODEL_EXTENSION_STRING([Txt a], [Txt B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "MODEL_PERCENTILE",
+   "category": "table_calc",
+   "probe": "MODEL_PERCENTILE([TXT_A])",
+   "sigma_template": "MODEL_PERCENTILE([Txt a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "MODEL_QUANTILE",
+   "category": "table_calc",
+   "probe": "MODEL_QUANTILE([TXT_A], [TXT_B])",
+   "sigma_template": "MODEL_QUANTILE([Txt a], [Txt B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "MONTH",
+   "category": "date",
+   "probe": "MONTH([DATE_A])",
+   "sigma_template": "Month([Date a])",
+   "sigma_functions": [
+    "Month"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "NOW",
+   "category": "date",
+   "probe": "NOW()",
+   "sigma_template": "Now()",
+   "sigma_functions": [
+    "Now"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "OUTLINE",
+   "category": "spatial",
+   "probe": "OUTLINE([TXT_A])",
+   "sigma_template": "OUTLINE([Txt a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "PARSE_URL",
+   "category": "additional_passthrough",
+   "probe": "PARSE_URL([TXT_A], [TXT_B])",
+   "sigma_template": "PARSE_URL([Txt a], [Txt B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "PARSE_URL_QUERY",
+   "category": "additional_passthrough",
+   "probe": "PARSE_URL_QUERY([TXT_A], [TXT_B])",
+   "sigma_template": "PARSE_URL_QUERY([Txt a], [Txt B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "PERCENTILE",
+   "category": "aggregate",
+   "probe": "PERCENTILE([NUM_A], 0.5)",
+   "sigma_template": "PercentileCont([Num a], 0.5)",
+   "sigma_functions": [
+    "PercentileCont"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "PI",
+   "category": "number",
+   "probe": "PI()",
+   "sigma_template": "Pi()",
+   "sigma_functions": [
+    "Pi"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "POWER",
+   "category": "number",
+   "probe": "POWER([NUM_A], 2)",
+   "sigma_template": "Power([Num a], 2)",
+   "sigma_functions": [
+    "Power"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "PREVIOUS_VALUE",
+   "category": "table_calc",
+   "probe": "PREVIOUS_VALUE(0)",
+   "sigma_template": "/* table calc: PREVIOUS_VALUE(0) */",
+   "sigma_functions": [],
+   "arg_transform": "none",
+   "context": "none",
+   "verify_flags": [
+    "⚠ Table calculation NOT converted — PREVIOUS_VALUE() has no Sigma equivalent. Untranslated fragment: PREVIOUS_VALUE(0)"
+   ],
+   "status": "not_converted"
+  },
+  {
+   "tableau_fn": "PROPER",
+   "category": "string",
+   "probe": "PROPER([TXT_A])",
+   "sigma_template": "Proper([Txt a])",
+   "sigma_functions": [
+    "Proper"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "QUARTER",
+   "category": "date",
+   "probe": "QUARTER([DATE_A])",
+   "sigma_template": "Quarter([Date a])",
+   "sigma_functions": [
+    "Quarter"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "RADIANS",
+   "category": "number",
+   "probe": "RADIANS([NUM_A])",
+   "sigma_template": "Radians([Num a])",
+   "sigma_functions": [
+    "Radians"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "RANK",
+   "category": "table_calc",
+   "probe": "RANK(SUM([NUM_A]))",
+   "sigma_template": "Rank(Sum([Num a]), \"desc\")",
+   "sigma_functions": [
+    "Rank",
+    "Sum"
+   ],
+   "arg_transform": "rewrite",
+   "context": "chart",
+   "verify_flags": [
+    "ℹ Table calc → Rank(Sum([Num a]), \"desc\") — CHART/grouped-element context ONLY: place in a grouped workbook element (group by the viz dimensions); window functi"
+   ],
+   "status": "chart_only"
+  },
+  {
+   "tableau_fn": "RANK_DENSE",
+   "category": "table_calc",
+   "probe": "RANK_DENSE(SUM([NUM_A]))",
+   "sigma_template": "RankDense(Sum([Num a]), \"desc\")",
+   "sigma_functions": [
+    "RankDense",
+    "Sum"
+   ],
+   "arg_transform": "rewrite",
+   "context": "chart",
+   "verify_flags": [
+    "ℹ Table calc → RankDense(Sum([Num a]), \"desc\") — CHART/grouped-element context ONLY: place in a grouped workbook element (group by the viz dimensions); window f"
+   ],
+   "status": "chart_only"
+  },
+  {
+   "tableau_fn": "RANK_MODIFIED",
+   "category": "table_calc",
+   "probe": "RANK_MODIFIED(SUM([NUM_A]))",
+   "sigma_template": "/* table calc: RANK_MODIFIED(SUM([NUM_A])) */",
+   "sigma_functions": [],
+   "arg_transform": "none",
+   "context": "none",
+   "verify_flags": [
+    "⚠ Table calculation not converted. Untranslated fragment: RANK_MODIFIED(SUM([NUM_A]))"
+   ],
+   "status": "not_converted"
+  },
+  {
+   "tableau_fn": "RANK_PERCENTILE",
+   "category": "table_calc",
+   "probe": "RANK_PERCENTILE(SUM([NUM_A]))",
+   "sigma_template": "RankPercentile(Sum([Num a]), \"desc\")",
+   "sigma_functions": [
+    "RankPercentile",
+    "Sum"
+   ],
+   "arg_transform": "rewrite",
+   "context": "chart",
+   "verify_flags": [
+    "ℹ Table calc → RankPercentile(Sum([Num a]), \"desc\") — CHART/grouped-element context ONLY: place in a grouped workbook element (group by the viz dimensions); win"
+   ],
+   "status": "chart_only"
+  },
+  {
+   "tableau_fn": "RANK_UNIQUE",
+   "category": "table_calc",
+   "probe": "RANK_UNIQUE(SUM([NUM_A]))",
+   "sigma_template": "Rank(Sum([Num a]), \"desc\")",
+   "sigma_functions": [
+    "Rank",
+    "Sum"
+   ],
+   "arg_transform": "rewrite",
+   "context": "chart",
+   "verify_flags": [
+    "ℹ Table calc → Rank(Sum([Num a]), \"desc\") — CHART/grouped-element context ONLY: place in a grouped workbook element (group by the viz dimensions); window functi",
+    "RANK_UNIQUE breaks ties arbitrarily; Sigma Rank assigns equal ranks to ties — verify against Tableau."
+   ],
+   "status": "chart_only"
+  },
+  {
+   "tableau_fn": "RAWSQLAGG_BOOL",
+   "category": "rawsql_passthrough",
+   "probe": "RAWSQLAGG_BOOL('1=1')",
+   "sigma_template": "RAWSQLAGG_BOOL(\"1=1\")",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "RAWSQLAGG_DATE",
+   "category": "rawsql_passthrough",
+   "probe": "RAWSQLAGG_DATE('%1', [DATE_A])",
+   "sigma_template": "RAWSQLAGG_DATE(\"%1\", [Date a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "RAWSQLAGG_DATETIME",
+   "category": "rawsql_passthrough",
+   "probe": "RAWSQLAGG_DATETIME('%1', [DATE_A])",
+   "sigma_template": "RAWSQLAGG_DATETIME(\"%1\", [Date a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "RAWSQLAGG_INT",
+   "category": "rawsql_passthrough",
+   "probe": "RAWSQLAGG_INT('%1', [NUM_A])",
+   "sigma_template": "RAWSQLAGG_INT(\"%1\", [Num a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "RAWSQLAGG_REAL",
+   "category": "rawsql_passthrough",
+   "probe": "RAWSQLAGG_REAL('%1', [NUM_A])",
+   "sigma_template": "RAWSQLAGG_REAL(\"%1\", [Num a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "RAWSQLAGG_STR",
+   "category": "rawsql_passthrough",
+   "probe": "RAWSQLAGG_STR('%1', [TXT_A])",
+   "sigma_template": "RAWSQLAGG_STR(\"%1\", [Txt a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "RAWSQL_BOOL",
+   "category": "rawsql_passthrough",
+   "probe": "RAWSQL_BOOL('1=1')",
+   "sigma_template": "RAWSQL_BOOL(\"1=1\")",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "RAWSQL_DATE",
+   "category": "rawsql_passthrough",
+   "probe": "RAWSQL_DATE('%1', [DATE_A])",
+   "sigma_template": "RAWSQL_DATE(\"%1\", [Date a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "RAWSQL_DATETIME",
+   "category": "rawsql_passthrough",
+   "probe": "RAWSQL_DATETIME('%1', [DATE_A])",
+   "sigma_template": "RAWSQL_DATETIME(\"%1\", [Date a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "RAWSQL_INT",
+   "category": "rawsql_passthrough",
+   "probe": "RAWSQL_INT('%1', [NUM_A])",
+   "sigma_template": "RAWSQL_INT(\"%1\", [Num a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "RAWSQL_REAL",
+   "category": "rawsql_passthrough",
+   "probe": "RAWSQL_REAL('%1', [NUM_A])",
+   "sigma_template": "RAWSQL_REAL(\"%1\", [Num a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "RAWSQL_SPATIAL",
+   "category": "rawsql_passthrough",
+   "probe": "RAWSQL_SPATIAL([TXT_A])",
+   "sigma_template": "RAWSQL_SPATIAL([Txt a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "RAWSQL_STR",
+   "category": "rawsql_passthrough",
+   "probe": "RAWSQL_STR('%1', [TXT_A])",
+   "sigma_template": "RAWSQL_STR(\"%1\", [Txt a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "REGEXP_EXTRACT",
+   "category": "additional_passthrough",
+   "probe": "REGEXP_EXTRACT([TXT_A], '(\\d+)')",
+   "sigma_template": "RegexpExtract([Txt a], \"(\\d+)\")",
+   "sigma_functions": [
+    "RegexpExtract"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "REGEXP_EXTRACT_NTH",
+   "category": "additional_passthrough",
+   "probe": "REGEXP_EXTRACT_NTH([TXT_A], [TXT_B], [TXT_C])",
+   "sigma_template": "REGEXP_EXTRACT_NTH([Txt a], [Txt B], [Txt C])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "REGEXP_MATCH",
+   "category": "additional_passthrough",
+   "probe": "REGEXP_MATCH([TXT_A], '(\\d+)')",
+   "sigma_template": "RegexpMatch([Txt a], \"(\\d+)\")",
+   "sigma_functions": [
+    "RegexpMatch"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "REGEXP_REPLACE",
+   "category": "additional_passthrough",
+   "probe": "REGEXP_REPLACE([TXT_A], '(\\d+)', '_')",
+   "sigma_template": "RegexpReplace([Txt a], \"(\\d+)\", \"_\")",
+   "sigma_functions": [
+    "RegexpReplace"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "REPLACE",
+   "category": "string",
+   "probe": "REPLACE([TXT_A], '-', '_')",
+   "sigma_template": "Replace([Txt a], \"-\", \"_\")",
+   "sigma_functions": [
+    "Replace"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "RIGHT",
+   "category": "string",
+   "probe": "RIGHT([TXT_A], 3)",
+   "sigma_template": "Right([Txt a], 3)",
+   "sigma_functions": [
+    "Right"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "ROUND",
+   "category": "number",
+   "probe": "ROUND([NUM_A], 2)",
+   "sigma_template": "Round([Num a], 2)",
+   "sigma_functions": [
+    "Round"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "RTRIM",
+   "category": "string",
+   "probe": "RTRIM([TXT_A])",
+   "sigma_template": "Rtrim([Txt a])",
+   "sigma_functions": [
+    "Rtrim"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "RTRIM_THIS",
+   "category": "additional_passthrough",
+   "probe": "RTRIM_THIS([TXT_A], [TXT_B])",
+   "sigma_template": "RTRIM_THIS([Txt a], [Txt B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "RUNNING_AVG",
+   "category": "table_calc",
+   "probe": "RUNNING_AVG(SUM([NUM_A]))",
+   "sigma_template": "CumulativeAvg(Sum([Num a]))",
+   "sigma_functions": [
+    "CumulativeAvg",
+    "Sum"
+   ],
+   "arg_transform": "rewrite",
+   "context": "chart",
+   "verify_flags": [
+    "ℹ Table calc → CumulativeAvg(Sum([Num a])) — CHART/grouped-element context ONLY: place in a grouped workbook element (group by the viz dimensions); window funct"
+   ],
+   "status": "chart_only"
+  },
+  {
+   "tableau_fn": "RUNNING_COUNT",
+   "category": "table_calc",
+   "probe": "RUNNING_COUNT(SUM([NUM_A]))",
+   "sigma_template": "CumulativeCount(Sum([Num a]))",
+   "sigma_functions": [
+    "CumulativeCount",
+    "Sum"
+   ],
+   "arg_transform": "rewrite",
+   "context": "chart",
+   "verify_flags": [
+    "ℹ Table calc → CumulativeCount(Sum([Num a])) — CHART/grouped-element context ONLY: place in a grouped workbook element (group by the viz dimensions); window fun"
+   ],
+   "status": "chart_only"
+  },
+  {
+   "tableau_fn": "RUNNING_MAX",
+   "category": "table_calc",
+   "probe": "RUNNING_MAX(SUM([NUM_A]))",
+   "sigma_template": "CumulativeMax(Sum([Num a]))",
+   "sigma_functions": [
+    "CumulativeMax",
+    "Sum"
+   ],
+   "arg_transform": "rewrite",
+   "context": "chart",
+   "verify_flags": [
+    "ℹ Table calc → CumulativeMax(Sum([Num a])) — CHART/grouped-element context ONLY: place in a grouped workbook element (group by the viz dimensions); window funct"
+   ],
+   "status": "chart_only"
+  },
+  {
+   "tableau_fn": "RUNNING_MIN",
+   "category": "table_calc",
+   "probe": "RUNNING_MIN(SUM([NUM_A]))",
+   "sigma_template": "CumulativeMin(Sum([Num a]))",
+   "sigma_functions": [
+    "CumulativeMin",
+    "Sum"
+   ],
+   "arg_transform": "rewrite",
+   "context": "chart",
+   "verify_flags": [
+    "ℹ Table calc → CumulativeMin(Sum([Num a])) — CHART/grouped-element context ONLY: place in a grouped workbook element (group by the viz dimensions); window funct"
+   ],
+   "status": "chart_only"
+  },
+  {
+   "tableau_fn": "RUNNING_SUM",
+   "category": "table_calc",
+   "probe": "RUNNING_SUM(SUM([NUM_A]))",
+   "sigma_template": "CumulativeSum(Sum([Num a]))",
+   "sigma_functions": [
+    "CumulativeSum",
+    "Sum"
+   ],
+   "arg_transform": "rewrite",
+   "context": "chart",
+   "verify_flags": [
+    "ℹ Table calc → CumulativeSum(Sum([Num a])) — CHART/grouped-element context ONLY: place in a grouped workbook element (group by the viz dimensions); window funct"
+   ],
+   "status": "chart_only"
+  },
+  {
+   "tableau_fn": "SCRIPT_BOOL",
+   "category": "table_calc",
+   "probe": "SCRIPT_BOOL([TXT_A])",
+   "sigma_template": "SCRIPT_BOOL([Txt a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "SCRIPT_INT",
+   "category": "table_calc",
+   "probe": "SCRIPT_INT([TXT_A])",
+   "sigma_template": "SCRIPT_INT([Txt a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "SCRIPT_REAL",
+   "category": "table_calc",
+   "probe": "SCRIPT_REAL([TXT_A])",
+   "sigma_template": "SCRIPT_REAL([Txt a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "SCRIPT_STR",
+   "category": "table_calc",
+   "probe": "SCRIPT_STR([TXT_A])",
+   "sigma_template": "SCRIPT_STR([Txt a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "SHAPETYPE",
+   "category": "spatial",
+   "probe": "SHAPETYPE([TXT_A])",
+   "sigma_template": "SHAPETYPE([Txt a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "SIGN",
+   "category": "number",
+   "probe": "SIGN([NUM_A])",
+   "sigma_template": "Sign([Num a])",
+   "sigma_functions": [
+    "Sign"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "SIN",
+   "category": "number",
+   "probe": "SIN([NUM_A])",
+   "sigma_template": "Sin([Num a])",
+   "sigma_functions": [
+    "Sin"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "SIZE",
+   "category": "table_calc",
+   "probe": "SIZE()",
+   "sigma_template": "/* table calc: SIZE() */",
+   "sigma_functions": [],
+   "arg_transform": "none",
+   "context": "none",
+   "verify_flags": [
+    "⚠ Table calculation NOT converted — SIZE() has no Sigma equivalent. Untranslated fragment: SIZE()"
+   ],
+   "status": "not_converted"
+  },
+  {
+   "tableau_fn": "SPACE",
+   "category": "string",
+   "probe": "SPACE(3)",
+   "sigma_template": "Repeat(\" \", 3)",
+   "sigma_functions": [
+    "Repeat"
+   ],
+   "arg_transform": "rewrite",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "SPLIT",
+   "category": "string",
+   "probe": "SPLIT([TXT_A], '-', 1)",
+   "sigma_template": "SplitPart([Txt a], \"-\", 1)",
+   "sigma_functions": [
+    "SplitPart"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "SQRT",
+   "category": "number",
+   "probe": "SQRT([NUM_A])",
+   "sigma_template": "Sqrt([Num a])",
+   "sigma_functions": [
+    "Sqrt"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "SQUARE",
+   "category": "number",
+   "probe": "SQUARE([NUM_A])",
+   "sigma_template": "Power([Num a], 2)",
+   "sigma_functions": [
+    "Power"
+   ],
+   "arg_transform": "rewrite",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "STARTSWITH",
+   "category": "string",
+   "probe": "STARTSWITH([TXT_A], '-')",
+   "sigma_template": "StartsWith([Txt a], \"-\")",
+   "sigma_functions": [
+    "StartsWith"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "STDEV",
+   "category": "aggregate",
+   "probe": "STDEV([NUM_A])",
+   "sigma_template": "StdDev([Num a])",
+   "sigma_functions": [
+    "StdDev"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "STDEVP",
+   "category": "aggregate",
+   "probe": "STDEVP([NUM_A])",
+   "sigma_template": "Sqrt(VariancePop([Num a]))",
+   "sigma_functions": [
+    "Sqrt",
+    "VariancePop"
+   ],
+   "arg_transform": "rewrite",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "STR",
+   "category": "type_conversion",
+   "probe": "STR([TXT_A])",
+   "sigma_template": "Text([Txt a])",
+   "sigma_functions": [
+    "Text"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "SUM",
+   "category": "aggregate",
+   "probe": "SUM([NUM_A])",
+   "sigma_template": "Sum([Num a])",
+   "sigma_functions": [
+    "Sum"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "TAN",
+   "category": "number",
+   "probe": "TAN([NUM_A])",
+   "sigma_template": "Tan([Num a])",
+   "sigma_functions": [
+    "Tan"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "TIMESTAMP_TO_USEC",
+   "category": "additional_passthrough",
+   "probe": "TIMESTAMP_TO_USEC([TXT_A])",
+   "sigma_template": "TIMESTAMP_TO_USEC([Txt a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "TLD",
+   "category": "additional_passthrough",
+   "probe": "TLD([TXT_A])",
+   "sigma_template": "TLD([Txt a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "TODAY",
+   "category": "date",
+   "probe": "TODAY()",
+   "sigma_template": "Today()",
+   "sigma_functions": [
+    "Today"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "TOTAL",
+   "category": "table_calc",
+   "probe": "TOTAL(SUM([NUM_A]))",
+   "sigma_template": "/* table calc: TOTAL(SUM([NUM_A])) */",
+   "sigma_functions": [],
+   "arg_transform": "none",
+   "context": "none",
+   "verify_flags": [
+    "⚠ Table calculation not converted. Untranslated fragment: TOTAL(SUM([NUM_A]))"
+   ],
+   "status": "not_converted"
+  },
+  {
+   "tableau_fn": "TRIM",
+   "category": "string",
+   "probe": "TRIM([TXT_A])",
+   "sigma_template": "Trim([Txt a])",
+   "sigma_functions": [
+    "Trim"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "UPPER",
+   "category": "string",
+   "probe": "UPPER([TXT_A])",
+   "sigma_template": "Upper([Txt a])",
+   "sigma_functions": [
+    "Upper"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "USEC_TO_TIMESTAMP",
+   "category": "additional_passthrough",
+   "probe": "USEC_TO_TIMESTAMP([TXT_A])",
+   "sigma_template": "USEC_TO_TIMESTAMP([Txt a])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "USERATTRIBUTE",
+   "category": "user",
+   "probe": "USERATTRIBUTE('attr')",
+   "sigma_template": "CurrentUserAttributeText(\"attr\")",
+   "sigma_functions": [
+    "CurrentUserAttributeText"
+   ],
+   "arg_transform": "rewrite",
+   "context": "rls",
+   "verify_flags": [],
+   "status": "rls"
+  },
+  {
+   "tableau_fn": "USERATTRIBUTEINCLUDES",
+   "category": "user",
+   "probe": "USERATTRIBUTEINCLUDES('attr', 'v')",
+   "sigma_template": "USERATTRIBUTEINCLUDES(\"attr\", \"v\")",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "USERDOMAIN",
+   "category": "user",
+   "probe": "USERDOMAIN()",
+   "sigma_template": "USERDOMAIN()",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "USERNAME",
+   "category": "user",
+   "probe": "USERNAME()",
+   "sigma_template": "CurrentUserEmail()",
+   "sigma_functions": [
+    "CurrentUserEmail"
+   ],
+   "arg_transform": "rewrite",
+   "context": "rls",
+   "verify_flags": [],
+   "status": "rls"
+  },
+  {
+   "tableau_fn": "VAR",
+   "category": "aggregate",
+   "probe": "VAR([NUM_A])",
+   "sigma_template": "Variance([Num a])",
+   "sigma_functions": [
+    "Variance"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "VARP",
+   "category": "aggregate",
+   "probe": "VARP([NUM_A])",
+   "sigma_template": "VariancePop([Num a])",
+   "sigma_functions": [
+    "VariancePop"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "WEEK",
+   "category": "date",
+   "probe": "WEEK([DATE_A])",
+   "sigma_template": "DatePart(\"week\", [Date a])",
+   "sigma_functions": [
+    "DatePart"
+   ],
+   "arg_transform": "rewrite",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "WINDOW_AVG",
+   "category": "table_calc",
+   "probe": "WINDOW_AVG(SUM([NUM_A]), -3, 0)",
+   "sigma_template": "MovingAvg(Sum([Num a]), 3)",
+   "sigma_functions": [
+    "MovingAvg",
+    "Sum"
+   ],
+   "arg_transform": "rewrite",
+   "context": "chart",
+   "verify_flags": [
+    "ℹ Table calc → MovingAvg(Sum([Num a]), 3) — CHART/grouped-element context ONLY: place in a grouped workbook element (group by the viz dimensions); window functi"
+   ],
+   "status": "chart_only"
+  },
+  {
+   "tableau_fn": "WINDOW_CORR",
+   "category": "table_calc",
+   "probe": "WINDOW_CORR(SUM([NUM_A]), SUM([NUM_B]), -3, 0)",
+   "sigma_template": "MovingCorr(Sum([Num a]), Sum([Num B]), 3)",
+   "sigma_functions": [
+    "MovingCorr",
+    "Sum"
+   ],
+   "arg_transform": "rewrite",
+   "context": "chart",
+   "verify_flags": [
+    "ℹ Table calc → MovingCorr(Sum([Num a]), Sum([Num B]), 3) — CHART/grouped-element context ONLY: place in a grouped workbook element (group by the viz dimensions)"
+   ],
+   "status": "chart_only"
+  },
+  {
+   "tableau_fn": "WINDOW_COUNT",
+   "category": "table_calc",
+   "probe": "WINDOW_COUNT(SUM([NUM_A]), -3, 0)",
+   "sigma_template": "MovingCount(Sum([Num a]), 3)",
+   "sigma_functions": [
+    "MovingCount",
+    "Sum"
+   ],
+   "arg_transform": "rewrite",
+   "context": "chart",
+   "verify_flags": [
+    "ℹ Table calc → MovingCount(Sum([Num a]), 3) — CHART/grouped-element context ONLY: place in a grouped workbook element (group by the viz dimensions); window func"
+   ],
+   "status": "chart_only"
+  },
+  {
+   "tableau_fn": "WINDOW_COVAR",
+   "category": "table_calc",
+   "probe": "WINDOW_COVAR(SUM([NUM_A]), SUM([NUM_B]), -3, 0)",
+   "sigma_template": "/* table calc: WINDOW_COVAR(SUM([NUM_A]), SUM([NUM_B]), -3, 0) */",
+   "sigma_functions": [],
+   "arg_transform": "none",
+   "context": "none",
+   "verify_flags": [
+    "⚠ Table calculation NOT converted — WINDOW_COVAR() has no Sigma equivalent. Untranslated fragment: WINDOW_COVAR(SUM([NUM_A]), SUM([NUM_B]), -3, 0)"
+   ],
+   "status": "not_converted"
+  },
+  {
+   "tableau_fn": "WINDOW_COVARP",
+   "category": "table_calc",
+   "probe": "WINDOW_COVARP(SUM([NUM_A]), SUM([NUM_B]), -3, 0)",
+   "sigma_template": "/* table calc: WINDOW_COVARP(SUM([NUM_A]), SUM([NUM_B]), -3, 0) */",
+   "sigma_functions": [],
+   "arg_transform": "none",
+   "context": "none",
+   "verify_flags": [
+    "⚠ Table calculation NOT converted — WINDOW_COVARP() has no Sigma equivalent. Untranslated fragment: WINDOW_COVARP(SUM([NUM_A]), SUM([NUM_B]), -3, 0)"
+   ],
+   "status": "not_converted"
+  },
+  {
+   "tableau_fn": "WINDOW_MAX",
+   "category": "table_calc",
+   "probe": "WINDOW_MAX(SUM([NUM_A]), -3, 0)",
+   "sigma_template": "MovingMax(Sum([Num a]), 3)",
+   "sigma_functions": [
+    "MovingMax",
+    "Sum"
+   ],
+   "arg_transform": "rewrite",
+   "context": "chart",
+   "verify_flags": [
+    "ℹ Table calc → MovingMax(Sum([Num a]), 3) — CHART/grouped-element context ONLY: place in a grouped workbook element (group by the viz dimensions); window functi"
+   ],
+   "status": "chart_only"
+  },
+  {
+   "tableau_fn": "WINDOW_MEDIAN",
+   "category": "table_calc",
+   "probe": "WINDOW_MEDIAN(SUM([NUM_A]), -3, 0)",
+   "sigma_template": "/* table calc: WINDOW_MEDIAN(SUM([NUM_A]), -3, 0) */",
+   "sigma_functions": [],
+   "arg_transform": "none",
+   "context": "none",
+   "verify_flags": [
+    "⚠ Table calculation NOT converted — WINDOW_MEDIAN() has no Sigma equivalent. Untranslated fragment: WINDOW_MEDIAN(SUM([NUM_A]), -3, 0)"
+   ],
+   "status": "not_converted"
+  },
+  {
+   "tableau_fn": "WINDOW_MIN",
+   "category": "table_calc",
+   "probe": "WINDOW_MIN(SUM([NUM_A]), -3, 0)",
+   "sigma_template": "MovingMin(Sum([Num a]), 3)",
+   "sigma_functions": [
+    "MovingMin",
+    "Sum"
+   ],
+   "arg_transform": "rewrite",
+   "context": "chart",
+   "verify_flags": [
+    "ℹ Table calc → MovingMin(Sum([Num a]), 3) — CHART/grouped-element context ONLY: place in a grouped workbook element (group by the viz dimensions); window functi"
+   ],
+   "status": "chart_only"
+  },
+  {
+   "tableau_fn": "WINDOW_PERCENTILE",
+   "category": "table_calc",
+   "probe": "WINDOW_PERCENTILE(SUM([NUM_A]), 0.5)",
+   "sigma_template": "/* table calc: WINDOW_PERCENTILE(SUM([NUM_A]), 0.5) */",
+   "sigma_functions": [],
+   "arg_transform": "none",
+   "context": "none",
+   "verify_flags": [
+    "⚠ Table calculation NOT converted — WINDOW_PERCENTILE() has no Sigma equivalent. Untranslated fragment: WINDOW_PERCENTILE(SUM([NUM_A]), 0.5)"
+   ],
+   "status": "not_converted"
+  },
+  {
+   "tableau_fn": "WINDOW_STDEV",
+   "category": "table_calc",
+   "probe": "WINDOW_STDEV(SUM([NUM_A]), -3, 0)",
+   "sigma_template": "MovingStdDev(Sum([Num a]), 3)",
+   "sigma_functions": [
+    "MovingStdDev",
+    "Sum"
+   ],
+   "arg_transform": "rewrite",
+   "context": "chart",
+   "verify_flags": [
+    "ℹ Table calc → MovingStdDev(Sum([Num a]), 3) — CHART/grouped-element context ONLY: place in a grouped workbook element (group by the viz dimensions); window fun"
+   ],
+   "status": "chart_only"
+  },
+  {
+   "tableau_fn": "WINDOW_STDEVP",
+   "category": "table_calc",
+   "probe": "WINDOW_STDEVP(SUM([NUM_A]), -3, 0)",
+   "sigma_template": "/* table calc: WINDOW_STDEVP(SUM([NUM_A]), -3, 0) */",
+   "sigma_functions": [],
+   "arg_transform": "none",
+   "context": "none",
+   "verify_flags": [
+    "⚠ Table calculation NOT converted — WINDOW_STDEVP() has no Sigma equivalent. Untranslated fragment: WINDOW_STDEVP(SUM([NUM_A]), -3, 0)"
+   ],
+   "status": "not_converted"
+  },
+  {
+   "tableau_fn": "WINDOW_SUM",
+   "category": "table_calc",
+   "probe": "WINDOW_SUM(SUM([NUM_A]), -3, 0)",
+   "sigma_template": "MovingSum(Sum([Num a]), 3)",
+   "sigma_functions": [
+    "MovingSum",
+    "Sum"
+   ],
+   "arg_transform": "rewrite",
+   "context": "chart",
+   "verify_flags": [
+    "ℹ Table calc → MovingSum(Sum([Num a]), 3) — CHART/grouped-element context ONLY: place in a grouped workbook element (group by the viz dimensions); window functi"
+   ],
+   "status": "chart_only"
+  },
+  {
+   "tableau_fn": "WINDOW_VAR",
+   "category": "table_calc",
+   "probe": "WINDOW_VAR(SUM([NUM_A]), -3, 0)",
+   "sigma_template": "MovingVariance(Sum([Num a]), 3)",
+   "sigma_functions": [
+    "MovingVariance",
+    "Sum"
+   ],
+   "arg_transform": "rewrite",
+   "context": "chart",
+   "verify_flags": [
+    "ℹ Table calc → MovingVariance(Sum([Num a]), 3) — CHART/grouped-element context ONLY: place in a grouped workbook element (group by the viz dimensions); window f"
+   ],
+   "status": "chart_only"
+  },
+  {
+   "tableau_fn": "WINDOW_VARP",
+   "category": "table_calc",
+   "probe": "WINDOW_VARP(SUM([NUM_A]), -3, 0)",
+   "sigma_template": "/* table calc: WINDOW_VARP(SUM([NUM_A]), -3, 0) */",
+   "sigma_functions": [],
+   "arg_transform": "none",
+   "context": "none",
+   "verify_flags": [
+    "⚠ Table calculation NOT converted — WINDOW_VARP() has no Sigma equivalent. Untranslated fragment: WINDOW_VARP(SUM([NUM_A]), -3, 0)"
+   ],
+   "status": "not_converted"
+  },
+  {
+   "tableau_fn": "XPATH_BOOLEAN",
+   "category": "additional_passthrough",
+   "probe": "XPATH_BOOLEAN([TXT_A], [TXT_B])",
+   "sigma_template": "XPATH_BOOLEAN([Txt a], [Txt B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "XPATH_DOUBLE",
+   "category": "additional_passthrough",
+   "probe": "XPATH_DOUBLE([TXT_A], [TXT_B])",
+   "sigma_template": "XPATH_DOUBLE([Txt a], [Txt B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "XPATH_FLOAT",
+   "category": "additional_passthrough",
+   "probe": "XPATH_FLOAT([TXT_A], [TXT_B])",
+   "sigma_template": "XPATH_FLOAT([Txt a], [Txt B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "XPATH_INT",
+   "category": "additional_passthrough",
+   "probe": "XPATH_INT([TXT_A], [TXT_B])",
+   "sigma_template": "XPATH_INT([Txt a], [Txt B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "XPATH_LONG",
+   "category": "additional_passthrough",
+   "probe": "XPATH_LONG([TXT_A], [TXT_B])",
+   "sigma_template": "XPATH_LONG([Txt a], [Txt B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "XPATH_SHORT",
+   "category": "additional_passthrough",
+   "probe": "XPATH_SHORT([TXT_A], [TXT_B])",
+   "sigma_template": "XPATH_SHORT([Txt a], [Txt B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "XPATH_STRING",
+   "category": "additional_passthrough",
+   "probe": "XPATH_STRING([TXT_A], [TXT_B])",
+   "sigma_template": "XPATH_STRING([Txt a], [Txt B])",
+   "sigma_functions": [],
+   "arg_transform": "passthrough",
+   "context": "none",
+   "verify_flags": [],
+   "status": "unmapped"
+  },
+  {
+   "tableau_fn": "YEAR",
+   "category": "date",
+   "probe": "YEAR([DATE_A])",
+   "sigma_template": "Year([Date a])",
+   "sigma_functions": [
+    "Year"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  },
+  {
+   "tableau_fn": "ZN",
+   "category": "logical",
+   "probe": "ZN(SUM([NUM_A]))",
+   "sigma_template": "Zn(Sum([Num a]))",
+   "sigma_functions": [
+    "Sum",
+    "Zn"
+   ],
+   "arg_transform": "name-map",
+   "context": "spec",
+   "verify_flags": [],
+   "status": "spec"
+  }
+ ]
+}

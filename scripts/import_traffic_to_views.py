@@ -36,11 +36,11 @@ import json
 import re
 import sys
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from lib.tableau_client import (TableauClient, TableauError, add_site_args, log,  # noqa: E402
+from lib.tableau_client import (TableauClient, TableauError, add_site_args, cfg, log,  # noqa: E402
                                 resolve_site_args, site_folder)
 
 # Candidate column names, matched case-insensitively, first found wins.
@@ -133,6 +133,10 @@ def load_view_map(out, site, fetch):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     add_site_args(ap)
+    ap.add_argument("--from", dest="date_from", default=None,
+                    help="first day the export covers (YYYY-MM-DD); default: export date minus TRAFFIC_WINDOW_DAYS")
+    ap.add_argument("--to", dest="date_to", default=None,
+                    help="last day the export covers (YYYY-MM-DD); default: the date the export file was saved")
     ap.add_argument("--fetch-map", action="store_true",
                     help="sign in once and list views for exact URL matching (otherwise uses the latest snapshot)")
     args = ap.parse_args()
@@ -206,8 +210,25 @@ def main():
     if not events:
         sys.exit("No usable access events found. Check the export's date column and Action filter.")
 
-    start = min(e[2] for e in events)
-    end = max(e[2] for e in events)
+    # The window is the period the export COVERS, not the span between its first and last
+    # event: a quiet site may have a handful of events in a six-month export. Tableau keeps
+    # TRAFFIC_WINDOW_DAYS of history (183 by default) and the export is taken at max range.
+    first_ev, last_ev = min(e[2] for e in events), max(e[2] for e in events)
+    window_days_cfg = int(cfg("TRAFFIC_WINDOW_DAYS", site, "183"))
+    if args.date_to:
+        end = datetime.strptime(args.date_to, "%Y-%m-%d")
+    else:
+        saved = datetime.fromtimestamp(max(f.stat().st_mtime for f in files))
+        end = max(last_ev, saved)
+    if args.date_from:
+        start = datetime.strptime(args.date_from, "%Y-%m-%d")
+    else:
+        start = min(first_ev, end - timedelta(days=window_days_cfg))
+    if not (args.date_from and args.date_to):
+        log(f"Window {start.date()}..{end.date()}: "
+            + ("given" if args.date_from or args.date_to else "assumed") + " from the export date and "
+            f"TRAFFIC_WINDOW_DAYS={window_days_cfg}; events span {first_ev.date()}..{last_ev.date()}. "
+            "Pass --from/--to if the export covered a different range.")
     span_weeks = max(1, -(-((end - start).days + 1) // 7))
     per_view = defaultdict(lambda: {"accesses": 0, "users": Counter(), "labels": {}, "weeks": set(),
                                     "months": Counter(), "first": None, "last": None, "how": None})
@@ -242,7 +263,7 @@ def main():
             "months": dict(sorted(v["months"].items())),
             "top_users": "; ".join(f"{v['labels'].get(k, k)} ({n})" for k, n in top),
         }
-    meta = {"format": 2, "imported_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "site": site_folder(site),
+    meta = {"format": 3, "first_event": first_ev.date().isoformat(), "last_event": last_ev.date().isoformat(), "imported_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "site": site_folder(site),
             "files": [f.name for f in files], "window_start": start.date().isoformat(),
             "window_end": end.date().isoformat(), "window_days": (end - start).days + 1,
             "window_weeks": span_weeks, "events": sum(e[5] for e in events),
