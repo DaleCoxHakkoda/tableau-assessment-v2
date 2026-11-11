@@ -299,10 +299,32 @@ value under the `retire` section.
 
 ### Combining sites
 
-Step 10 also rebuilds two cross-site files in `output/_server/` from every site folder's
-`summary.csv`: `summary-all-sites.csv` (all rows stacked, for import or pivot tables) and
-`summary-all-sites-wide.csv` (one row per metric, one column per site, for copy-paste).
+Step 10 also rebuilds three cross-site files in `output/_server/` from every site folder's
+`summary.csv`:
+
+| File | Shape | Use |
+|---|---|---|
+| `summary-rollup.csv` | one row per metric: the all-sites total | The rollup to paste into a workbook or deck. |
+| `summary-all-sites-wide.csv` | one row per metric: `ALL_SITES`, then one column per site | Totals next to the per-site breakdown. |
+| `summary-all-sites.csv` | every site's rows stacked, plus `ALL_SITES` rows | Import or pivot tables. |
+
+The `rollup` column says how each total was formed. Counts are summed (`sum`, or
+`sum of N of M sites` when some sites have not run that step). Warehouse tables and
+database hosts are counted **once across sites** (`distinct across sites`), because several
+sites often share them. The traffic window spans the `earliest` start to the `latest` end.
+Role, run time and window lengths are `per-site only` and left out of `summary-rollup.csv`.
 Each site's numbers are as of its own last step 10 run; the `generated_at` row shows when.
+
+**Coverage.** Totals include only sites where the PAT owner is a Site (or Server)
+Administrator. A site below that (`PARTIAL` in step 00) yields an inventory of only what
+the owner can open, so its numbers are kept out of the totals (marked
+`PARTIAL, not in totals` in the wide file) and its size is reported instead. The
+`coverage` rows at the top of `summary-rollup.csv` give sites by access level, workbooks
+assessed, workbooks **not** assessed (the Metadata API's workbook count for partial sites,
+a floor), the coverage percentage, and the sites pending access with their current role.
+They come from each site's latest step 00 result, so include every site in `TABLEAU_SITES`
+and run `check_connectivity.py --all-sites --roles-only`; a site with no step 00 result is
+not counted.
 
 Each site's outputs are self-contained. Table keys are identical across sites, so
 concatenating `tables.csv` from every site and grouping by `table_key` shows which
@@ -375,7 +397,7 @@ Planned as step 13 (`sequence_migration.py`) once the pipeline DAG exists:
 ## Versions
 
 The repo version is in `VERSION` at the root. Every script prints it on its first line
-(`tableau-assessment-py 2026.11.10; loaded config from ...`), `run.log` records it on each
+(`tableau-assessment-py 2026.11.10.2; loaded config from ...`), `run.log` records it on each
 run's header line, and `summary.csv` carries it as `code_version`, so any output can be
 traced to the code that produced it. Bump `VERSION` with each change.
 

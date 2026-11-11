@@ -806,21 +806,155 @@ def write_summary(out_dir, dest, reports, unpublished, datasources, custom_sql, 
                     sites.append(r["site"])
     if not stacked:
         return
+    val = {(r["section"], r["metric"], r["site"]): r["value"] for r in stacked}
+    desc = {(r["section"], r["metric"]): r["description"] for r in stacked if r["description"]}
+    access = site_access(root)
+    # Sites below Site Administrator (PARTIAL) or without access stay out of the totals: their
+    # inventory covers only what the PAT owner can open. Their size is reported under coverage.
+    in_total = [s for s in sites if access.get(s, {}).get("access", "FULL") == "FULL"]
+    excluded = [s for s in sites if s not in in_total]
+    totals, how = rollup_totals(root, order, in_total, val)
+    coverage = coverage_rows(access, in_total, excluded)
+
     server = root / "_server"
     server.mkdir(parents=True, exist_ok=True)
     with open(server / "summary-all-sites.csv", "w", newline="", encoding="utf-8") as fh:
         wr = csv.DictWriter(fh, fieldnames=cols, lineterminator="\n")
         wr.writeheader()
         wr.writerows(stacked)
-    val = {(r["section"], r["metric"], r["site"]): r["value"] for r in stacked}
-    desc = {(r["section"], r["metric"]): r["description"] for r in stacked if r["description"]}
+        wr.writerows({"site": "ALL_SITES", "section": "coverage", "metric": m, "value": v, "description": d}
+                     for m, v, _, d in coverage)
+        wr.writerows({"site": "ALL_SITES", "section": sec, "metric": met, "value": totals[(sec, met)],
+                      "description": desc.get((sec, met), "")} for sec, met in order)
     with open(server / "summary-all-sites-wide.csv", "w", newline="", encoding="utf-8") as fh:
         wr = csv.writer(fh, lineterminator="\n")
-        wr.writerow(["section", "metric"] + sites + ["description"])
+        wr.writerow(["section", "metric", "ALL_SITES", "rollup"]
+                    + [s if s in in_total else f"{s} (PARTIAL, not in totals)" for s in sites] + ["description"])
+        for m, v, h, d in coverage:
+            wr.writerow(["coverage", m, v, h] + [""] * len(sites) + [d])
         for sec, met in order:
-            wr.writerow([sec, met] + [val.get((sec, met, s), "") for s in sites] + [desc.get((sec, met), "")])
-    log(f"Summary: {dest / 'summary.csv'}; all sites ({len(sites)}): {server / 'summary-all-sites-wide.csv'}")
+            wr.writerow([sec, met, totals[(sec, met)], how[(sec, met)]]
+                        + [val.get((sec, met, s), "") for s in sites] + [desc.get((sec, met), "")])
+    with open(server / "summary-rollup.csv", "w", newline="", encoding="utf-8") as fh:
+        wr = csv.writer(fh, lineterminator="\n")
+        wr.writerow(["section", "metric", "value", "rollup", "description"])
+        for m, v, h, d in coverage:
+            wr.writerow(["coverage", m, v, h, d])
+        wr.writerow(["site", "sites", len(in_total), "count", "sites in the totals below: " + ", ".join(in_total)])
+        for sec, met in order:
+            if how[(sec, met)] != "per-site only":
+                wr.writerow([sec, met, totals[(sec, met)], how[(sec, met)], desc.get((sec, met), "")])
+    log(f"Summary: {dest / 'summary.csv'}; rollup across {len(in_total)} site(s): {server / 'summary-rollup.csv'}")
+    cov = {m: v for m, v, _, _ in coverage}
+    if cov.get("sites_pending_access"):
+        log(f"Coverage: {cov['workbooks_assessed']} workbooks assessed, {cov['workbooks_not_assessed']} not assessed "
+            f"({cov['coverage_pct']}% coverage); pending access: {cov['sites_pending_access']}")
 
+
+# How each metric combines across sites. Anything not listed is summed when every value is a number.
+PER_SITE_ONLY = {("site", "generated_at"), ("site", "site_role"), ("site", "fetch_errors"),
+                 ("usage_snapshots", "source"), ("usage_snapshots", "snapshots"),
+                 ("usage_snapshots", "window_days"), ("usage_traffic", "window_days")}
+EARLIEST = {("usage_traffic", "window_start")}
+LATEST = {("usage_traffic", "window_end"), ("site", "code_version")}
+
+
+def _num(v):
+    try:
+        f = float(v)
+        return int(f) if f.is_integer() else f
+    except (TypeError, ValueError):
+        return None
+
+
+def site_access(root):
+    """Per site folder: role, access level and workbook counts from its latest step 00 check."""
+    out = {}
+    for p in root.glob("*/connectivity.json"):
+        if p.parent.name.startswith("_"):
+            continue
+        try:
+            c = json.loads(p.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        role, signin = c.get("site_role") or "", c.get("sign_in")
+        if signin == "failed":
+            level = "NO ACCESS"
+        elif role.startswith(("SiteAdministrator", "ServerAdministrator")):
+            level = "FULL"
+        elif role:
+            level = "PARTIAL"
+        else:
+            level = "UNKNOWN"
+        out[p.parent.name] = {"access": level, "role": role, "checked_at": c.get("checked_at"),
+                              "site_workbooks": c.get("metadata_workbooks"),
+                              "visible_workbooks": c.get("rest_workbooks")}
+    return out
+
+
+def coverage_rows(access, in_total, excluded):
+    """(metric, value, rollup, description) rows describing how much of the estate is assessed."""
+    known = dict(access)
+    full = [s for s, a in known.items() if a["access"] == "FULL"]
+    partial = [s for s, a in known.items() if a["access"] == "PARTIAL"]
+    none = [s for s, a in known.items() if a["access"] == "NO ACCESS"]
+    assessed = sum(known[s]["site_workbooks"] or 0 for s in in_total if s in known)
+    not_assessed = sum(known[s]["site_workbooks"] or 0 for s in partial)
+    total = assessed + not_assessed
+    pending = sorted(set(partial) | set(none))
+    checked = max((a["checked_at"] or "" for a in known.values()), default="")[:10]
+    return [
+        ("sites_full_access", len(full), "count", "Site/Server Administrator: complete inventory"),
+        ("sites_partial_access", len(partial), "count", "lower role: inventory left out of the totals"),
+        ("sites_no_access", len(none), "count", "sign-in refused"),
+        ("workbooks_assessed", assessed, "sum", "workbooks on sites in the totals (Metadata API count)"),
+        ("workbooks_not_assessed", not_assessed, "sum",
+         "at least this many workbooks on PARTIAL sites, pending Site Administrator access"),
+        ("coverage_pct", round(100 * assessed / total, 1) if total else "", "assessed / (assessed + not assessed)",
+         "share of known workbooks covered; sites with no access are not counted"),
+        ("sites_pending_access", ", ".join(f"{s} ({known[s]['role'] or known[s]['access']})" for s in pending),
+         "list", "grant Site Administrator to complete the assessment"),
+        ("sites_excluded_from_totals", ", ".join(excluded), "list", "ran step 10 but below Site Administrator"),
+        ("access_checked_at", checked, "latest", "most recent step 00 check across sites"),
+    ]
+
+
+def rollup_totals(root, order, sites, val):
+    """Combine each metric across the given sites. Returns ({key: value}, {key: how it was combined})."""
+    totals, how = {}, {}
+    # Distinct counts for things several sites can share (counted once, not per site).
+    tables = set()
+    for s in sites:
+        p = root / s / "report-inventory" / "tables.csv"
+        if p.exists():
+            with open(p, encoding="utf-8") as fh:
+                tables |= {r["table_key"] for r in csv.DictReader(fh) if r.get("table_key")}
+    hosts = {met for sec, met in order if sec == "source_hosts" and met != "distinct_hosts"
+             and any(val.get((sec, met, s)) not in (None, "") for s in sites)}
+    for key in order:
+        vals = [val.get((key[0], key[1], s), "") for s in sites]
+        present = [v for v in vals if v not in ("", None)]
+        if key == ("lineage", "warehouse_tables"):
+            totals[key], how[key] = len(tables), "distinct across sites"
+        elif key == ("source_hosts", "distinct_hosts"):
+            totals[key], how[key] = len(hosts), "distinct across sites"
+        elif key in PER_SITE_ONLY:
+            totals[key], how[key] = "", "per-site only"
+        elif key in EARLIEST:
+            totals[key], how[key] = (min(present) if present else ""), "earliest"
+        elif key in LATEST:
+            totals[key], how[key] = (max(present) if present else ""), "latest"
+        else:
+            nums = [_num(v) for v in present]
+            if present and all(n is not None for n in nums):
+                totals[key], how[key] = sum(nums), "sum"
+                # A missing connection type or host just means zero on that site; elsewhere a
+                # missing value means the site has not run that step, which the label says.
+                if len(present) < len(sites) and key[0] not in ("source_types", "source_hosts"):
+                    how[key] = f"sum of {len(present)} of {len(sites)} sites"
+            else:
+                totals[key], how[key] = "", "per-site only"
+    return totals, how
 
 if __name__ == "__main__":
     main()
