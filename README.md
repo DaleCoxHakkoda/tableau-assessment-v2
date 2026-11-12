@@ -155,6 +155,16 @@ and appends each site's output to `output/<site>/run.log`.
 
 ## Migration planning (steps 04, 05, 11, 12)
 
+### Population: nothing is filtered out
+
+Every workbook is in the migration population. Retire candidates are **not** excluded
+from any count, ranking, cluster, wave, pipeline or gap figure: `retire_candidate` (per
+report in `reports.csv`, per workbook in `workbooks.csv`) and the retire counts in the
+summaries are information only. Retirement is a suggestion until the customer confirms it;
+filtering confirmed retirements is a capability to add explicitly when that happens.
+Usage still orders the priority ranking, so a workbook nobody opened ranks lower, but it
+keeps its path, wave and place in every count.
+
 ### Complexity (step 05)
 
 Runs Sigma's own gap scanner (vendored unchanged in `vendor/tableau-to-sigma/`, Apache 2.0)
@@ -176,23 +186,23 @@ verdicts in one table:
 
 | Column | Meaning |
 |---|---|
-| `score`, `tag` | value = accesses × √users; cost = 10 × unhandled + 3 × manual + hint features; score = value ÷ (1 + cost). Tags: `retire-candidate`, `needs-gap-review` (any unhandled), `migrate-first` (score ≥ 20, no manual or unhandled), `easy-win` (≥ 10), `moderate`, `not-scanned`. |
+| `score`, `tag` | value = accesses × √users; cost = 10 × unhandled + 3 × manual + hint features; score = value ÷ (1 + cost). Tags: `needs-gap-review` (any unhandled), `migrate-first` (score ≥ 20, no manual or unhandled), `easy-win` (≥ 10), `moderate`, `not-scanned`. |
 | `source_readiness` | Worst of its reports: `in-snowflake`, `warehouse-mapped` (traced to warehouse tables not yet in Snowflake), `needs-mapping` (database known, tables not), `needs-landing` (files, extract-only, localhost). |
-| `recommended_path` | `retire-candidate` (every data report is one), `land-data-first`, `convert-with-gap-review`, `convert`; `consolidate-into-primary` once a step 12 decision is recorded. |
+| `recommended_path` | `land-data-first`, `convert-with-gap-review`, `convert`; `consolidate-into-primary` once a step 12 decision is recorded. |
 | `cluster_id` | Data-model cluster: workbooks that would share one Sigma data model. Linked first by a shared published datasource, then by warehouse-table overlap (Jaccard ≥ 0.5, `--similarity`), ignoring hub tables used by more than 5% of workbooks (`--hub-pct`, e.g. a date dimension). `clusters.csv` lists them. |
-| `suggested_wave` | A starting point for the wave plan, set per cluster from its least-ready member, since a cluster moves together: 1 in Snowflake, 2 warehouse-mapped (after its pipelines reach Snowflake), 3 needs mapping or landing, `hold` for retire candidates. |
+| `suggested_wave` | A starting point for the wave plan, set per cluster from its least-ready member, since a cluster moves together: 1 in Snowflake, 2 warehouse-mapped (after its pipelines reach Snowflake), 3 needs mapping or landing. |
 | `blockers` | Why it is not wave 1: unhandled or manual features, sources, a missing scan. |
 
 Waves are a proposal to take to the client with the pipeline plan, not a decision.
 
 Step 11's `workbooks` section in `summary.csv` (and the rollup) counts paths, waves and
-parity bands, and gives `avg_predicted_parity_pct` over active scanned workbooks. Across
-sites that average is weighted by each site's `parity_scanned_active`, not a plain mean of
-site averages; `unhandled_features_active` and `manual_features_active` sum the gap counts.
+parity bands, and gives `avg_predicted_parity_pct` over scanned workbooks. Across sites
+that average is weighted by each site's `parity_scanned`, not a plain mean of site
+averages; `unhandled_features` and `manual_features` sum the gap counts.
 
 ### Pipeline priority (step 11): `pipeline-priority.csv`
 
-Which warehouse tables to land in Snowflake first. One row per table that active
+Which warehouse tables to land in Snowflake first. One row per table that the
 workbooks read, ranked. Tables already in Snowflake count as landed. A workbook is
 **unlocked** once every table it reads is landed and it has no other blocker (files,
 extract-only, localhost, unmapped sources; those are counted as `blocked_beyond_tables`).
@@ -201,13 +211,13 @@ Ranking is greedy: each pick is the table with the most pending usage behind it,
 workbook's opens are shared across the tables it still waits on. A table that completes a
 fact-and-dimension set therefore follows its siblings, and a date dimension everything
 reads goes early. The cumulative columns read as "landing the first N tables unlocks X% of
-the active usage (and Y% of the workbooks) that tables alone can unlock".
+the usage (and Y% of the workbooks) that tables alone can unlock".
 
 | Column | Meaning |
 |---|---|
-| `active_workbooks`, `active_accesses`, `sites` | Active workbooks that read the table, their opens, and how many sites they are on. |
+| `workbooks`, `accesses`, `sites` | Workbooks that read the table, their opens, and how many sites they are on. |
 | `workbooks_unlocked_now` | Workbooks whose last missing table this is. |
-| `cum_pct_unlockable_accesses`, `cum_pct_unlockable_workbooks` | Running share unlocked after landing tables 1 to N. |
+| `cumulative_pct_unlockable_accesses`, `cumulative_pct_unlockable_workbooks` | Running share unlocked after landing tables 1 to N. |
 | `clusters`, `example_workbooks` | Which data-model clusters and workbooks depend on it. |
 
 `output/_server/pipeline-priority-all-sites.csv` runs the same ranking over every
@@ -223,14 +233,14 @@ Talend jobs behind them. Once the job inventory exists, rank jobs by the tables 
 
 A workbook is routed to `convert-with-gap-review` for any unhandled feature, so that count
 alone cannot say whether the estate has hundreds of distinct problems or a few repeated
-ones. This file answers it: one row per unhandled or manual feature found in active
-workbooks, unhandled first, ranked by how many active workbooks have it.
+ones. This file answers it: one row per unhandled or manual feature found in the
+workbooks, unhandled first, ranked by how many workbooks have it.
 
 | Column | Meaning |
 |---|---|
-| `active_workbooks`, `pct_of_scanned_active`, `occurrences`, `active_accesses` | How widespread the feature is. |
+| `workbooks`, `pct_of_scanned`, `occurrences`, `accesses` | How widespread the feature is. |
 | `sole_unhandled_for` | Workbooks where it is the only unhandled feature. |
-| `cum_gap_review_cleared`, `cum_pct_gap_review_cleared` | Gap-review workbooks whose unhandled features are all within the top N: the ones a known Sigma pattern for those N would clear. |
+| `cumulative_gap_review_cleared`, `cumulative_pct_gap_review_cleared` | Gap-review workbooks whose unhandled features are all within the top N: the ones a known Sigma pattern for those N would clear. |
 
 `output/_server/gap-features-all-sites.csv` ranks across all full-access sites, and the
 `gaps` section of the rollup gives `cleared_by_top5`, `cleared_by_top10` and

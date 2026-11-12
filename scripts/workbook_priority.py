@@ -5,7 +5,8 @@ Usage:
     python scripts/workbook_priority.py --site <site> [--similarity 0.5] [--hub-pct 5]
 
 Runs after step 10. Rolls each workbook's reports up into one row and combines:
-  * usage        Traffic to Views opens and users (else snapshot opens), retire status
+  * usage        Traffic to Views opens and users (else snapshot opens); retire-candidate
+                 status is carried as information only (see "Population" below)
   * complexity   predicted parity, band and gap counts from step 05 (if it has run)
   * sources      how ready its data is for Sigma on Snowflake (worst of its reports):
                    in-snowflake       every source already in Snowflake
@@ -20,37 +21,41 @@ Runs after step 10. Rolls each workbook's reports up into one row and combines:
 Score and tag follow the Sigma assessment skill's shortlist:
     value = accesses x sqrt(users);  cost = 10 x unhandled + 3 x manual + hint features
     score = value / (1 + cost)
-    tag:  retire-candidate (every data report is a retire candidate) | needs-gap-review
-          (any unhandled feature) | migrate-first (score >= 20, no manual/unhandled) |
+    tag:  needs-gap-review (any unhandled feature) | migrate-first (score >= 20, no manual/unhandled) |
           easy-win (score >= 10) | moderate | not-scanned (no complexity yet)
 
-recommended_path: retire-candidate | land-data-first | convert-with-gap-review | convert
+recommended_path: land-data-first | convert-with-gap-review | convert
 suggested_wave (a starting point for the wave plan, not a decision), set per cluster from
-its least-ready active member, since a cluster moves together:
+its least-ready member, since a cluster moves together:
     1 in-snowflake, 2 warehouse-mapped (after its pipelines reach Snowflake),
-    3 needs-mapping or needs-landing, hold = retire candidates
+    3 needs-mapping or needs-landing
+
+Population: EVERY workbook is in the migration population. Retire candidates are not
+filtered out of any count, ranking, cluster or wave until the customer confirms retirement
+and a filter is explicitly added; retire_candidate / retire_candidate_reports are
+information only. Usage still orders the ranking, so unused workbooks rank lower.
 
 Pipeline priority: which warehouse tables to land in Snowflake first. Tables already in
 Snowflake count as landed. A workbook is unlocked once every table it reads is landed and
 it has no other blocker (files, extract-only, localhost, unmapped sources). Tables are
 picked greedily: each pick is the table with the most pending usage behind it, where a
 workbook's opens (at least 1) are shared across the tables it still waits on. The
-cumulative columns then read "landing the first N tables unlocks X% of active usage".
+cumulative columns then read "landing the first N tables unlocks X% of usage".
 It is an anchor for the pipeline conversation, not a plan: it knows nothing yet about
 the pipelines (Talend jobs) behind each table.
 
-Gap features: which unhandled (and manual) Tableau features recur across the active estate.
+Gap features: which unhandled (and manual) Tableau features recur across the estate.
 A workbook is tagged needs-gap-review for ANY unhandled feature, so the count alone hides
 whether that is hundreds of distinct problems or a few repeated ones. Unhandled features are
-ranked by how many active workbooks have them; cum_gap_review_cleared counts the gap-review
+ranked by how many workbooks have them; cumulative_gap_review_cleared counts the gap-review
 workbooks whose unhandled features are ALL within the top N, i.e. that would no longer need
 gap review once those N have a known Sigma pattern.
 
 Writes to output/<site>/report-inventory/:
   workbooks.csv          one row per workbook
   clusters.csv           one row per data-model cluster
-  pipeline-priority.csv  one row per warehouse table used by active workbooks, ranked
-  gap-features.csv       one row per unhandled or manual feature in active workbooks, ranked
+  pipeline-priority.csv  one row per warehouse table the workbooks use, ranked
+  gap-features.csv       one row per unhandled or manual feature found, ranked
   migration-plan.json    all of it, plus a summary
 and to output/_server/:
   pipeline-priority-all-sites.csv   the same ranking over every full-access site together
@@ -159,14 +164,14 @@ def pipeline_priority(wbs, meta):
         users = by_table[t]
         rows.append({
             "pipeline_rank": n, "table_key": t, "connection_type": meta.get(t, {}).get("connection_type", ""),
-            "host": meta.get(t, {}).get("host", ""), "active_workbooks": len(users),
-            "active_accesses": sum(W[k]["accesses"] for k in users),
+            "host": meta.get(t, {}).get("host", ""), "workbooks": len(users),
+            "accesses": sum(W[k]["accesses"] for k in users),
             "sites": len({W[k]["site"] for k in users}),
             "workbooks_unlocked_now": len(newly),
-            "cum_workbooks_unlocked": len(unlocked),
-            "cum_pct_unlockable_workbooks": round(100 * len(unlocked) / total_wb, 1) if total_wb else "",
-            "cum_accesses_unlocked": acc_done,
-            "cum_pct_unlockable_accesses": round(100 * acc_done / total_acc, 1) if total_acc else "",
+            "cumulative_workbooks_unlocked": len(unlocked),
+            "cumulative_pct_unlockable_workbooks": round(100 * len(unlocked) / total_wb, 1) if total_wb else "",
+            "cumulative_accesses_unlocked": acc_done,
+            "cumulative_pct_unlockable_accesses": round(100 * acc_done / total_acc, 1) if total_acc else "",
             "clusters": "; ".join(sorted({W[k]["cluster"] for k in users if W[k]["cluster"]}))[:300],
             "example_workbooks": "; ".join(sorted(W[k]["name"] or "" for k in users)[:5]),
         })
@@ -179,22 +184,22 @@ def pipeline_priority(wbs, meta):
         "unlockable_workbooks": total_wb,
         "blocked_beyond_tables": sum(1 for w in wbs if not w["unlockable"]),
         "unlocked_before_any_landing": len({w["key"] for w in unlockable if not (set(w["tables"]) - landed)}),
-        "tables_for_50pct_usage": first("cum_pct_unlockable_accesses", 50),
-        "tables_for_80pct_usage": first("cum_pct_unlockable_accesses", 80),
-        "tables_for_50pct_workbooks": first("cum_pct_unlockable_workbooks", 50),
-        "tables_for_80pct_workbooks": first("cum_pct_unlockable_workbooks", 80),
+        "tables_for_50pct_usage": first("cumulative_pct_unlockable_accesses", 50),
+        "tables_for_80pct_usage": first("cumulative_pct_unlockable_accesses", 80),
+        "tables_for_50pct_workbooks": first("cumulative_pct_unlockable_workbooks", 50),
+        "tables_for_80pct_workbooks": first("cumulative_pct_unlockable_workbooks", 80),
     }
     return rows, milestones
 
 
-PIPE_COLS = ["pipeline_rank", "table_key", "connection_type", "host", "active_workbooks", "active_accesses", "sites",
-             "workbooks_unlocked_now", "cum_workbooks_unlocked", "cum_pct_unlockable_workbooks",
-             "cum_accesses_unlocked", "cum_pct_unlockable_accesses", "clusters", "example_workbooks"]
+PIPE_COLS = ["pipeline_rank", "table_key", "connection_type", "host", "workbooks", "accesses", "sites",
+             "workbooks_unlocked_now", "cumulative_workbooks_unlocked", "cumulative_pct_unlockable_workbooks",
+             "cumulative_accesses_unlocked", "cumulative_pct_unlockable_accesses", "clusters", "example_workbooks"]
 PIPE_HELP = {
-    "tables_to_land": "warehouse tables used by active workbooks and not yet in Snowflake",
-    "tables_already_in_snowflake": "tables used by active workbooks already in Snowflake",
-    "unlockable_workbooks": "active workbooks whose only data dependency is warehouse tables",
-    "blocked_beyond_tables": "active workbooks that also need files, extracts or local data landed, or sources mapped",
+    "tables_to_land": "warehouse tables the workbooks use that are not yet in Snowflake",
+    "tables_already_in_snowflake": "tables the workbooks use that are already in Snowflake",
+    "unlockable_workbooks": "workbooks whose only data dependency is warehouse tables",
+    "blocked_beyond_tables": "workbooks that also need files, extracts or local data landed, or sources mapped",
     "unlocked_before_any_landing": "unlockable workbooks already reading only Snowflake",
     "tables_for_50pct_usage": "tables to land, in pipeline-priority order, to unlock half the usage of unlockable workbooks",
     "tables_for_80pct_usage": "the same, for 80% of usage",
@@ -211,14 +216,14 @@ def write_pipeline_csv(path, rows):
 
 
 AUDIT_UNAVAILABLE = "Converter-backed formula audit unavailable"
-GAP_COLS = ["gap_rank", "feature", "status", "active_workbooks", "pct_of_scanned_active", "occurrences",
-            "active_accesses", "sole_unhandled_for", "cum_gap_review_cleared", "cum_pct_gap_review_cleared",
+GAP_COLS = ["gap_rank", "feature", "status", "workbooks", "pct_of_scanned", "occurrences",
+            "accesses", "sole_unhandled_for", "cumulative_gap_review_cleared", "cumulative_pct_gap_review_cleared",
             "example_workbooks"]
 GAP_HELP = {
-    "scanned_active": "active workbooks with a complexity scan",
-    "gap_review_workbooks": "scanned active workbooks with at least one unhandled feature",
+    "scanned": "workbooks with a complexity scan",
+    "gap_review_workbooks": "scanned workbooks with at least one unhandled feature",
     "unhandled_feature_types": "distinct unhandled features across them",
-    "manual_feature_types": "distinct manual features across scanned active workbooks",
+    "manual_feature_types": "distinct manual features across scanned workbooks",
     "cleared_by_top1": "gap-review workbooks whose only unhandled feature is the most common one",
     "cleared_by_top5": "gap-review workbooks whose unhandled features are all among the 5 most common",
     "cleared_by_top10": "the same, for the 10 most common",
@@ -228,7 +233,7 @@ GAP_HELP = {
 
 
 def gap_breakdown(entries):
-    """entries: dicts with key, name, accesses, features [{name, status, count}] (scanned active workbooks).
+    """entries: dicts with key, name, accesses, features [{name, status, count}] (scanned workbooks).
 
     Returns (rows, milestones)."""
     stats = {}
@@ -256,29 +261,29 @@ def gap_breakdown(entries):
     covered, rows, rank = set(), [], 0
     for k in order:
         s = stats[k]
-        row = {"feature": k[0], "status": k[1], "active_workbooks": len(s["wbs"]),
-               "pct_of_scanned_active": round(100 * len(s["wbs"]) / n, 1) if n else "",
-               "occurrences": s["occ"], "active_accesses": s["acc"],
+        row = {"feature": k[0], "status": k[1], "workbooks": len(s["wbs"]),
+               "pct_of_scanned": round(100 * len(s["wbs"]) / n, 1) if n else "",
+               "occurrences": s["occ"], "accesses": s["acc"],
                "example_workbooks": "; ".join(sorted(s["names"])[:5])}
         if k[1] == "unhandled":
             rank += 1
             covered.add(k[0])
             row.update(gap_rank=rank,
                        sole_unhandled_for=sum(1 for w in s["wbs"] if unhandled_of.get(w) == {k[0]}),
-                       cum_gap_review_cleared=sum(1 for u in unhandled_of.values() if u <= covered))
-            row["cum_pct_gap_review_cleared"] = (round(100 * row["cum_gap_review_cleared"] / gap_total, 1)
+                       cumulative_gap_review_cleared=sum(1 for u in unhandled_of.values() if u <= covered))
+            row["cumulative_pct_gap_review_cleared"] = (round(100 * row["cumulative_gap_review_cleared"] / gap_total, 1)
                                                  if gap_total else "")
         rows.append(row)
     un_rows = [r for r in rows if r["status"] == "unhandled"]
 
     def cleared(top):
-        return un_rows[min(top, len(un_rows)) - 1]["cum_gap_review_cleared"] if un_rows else 0
-    ms = {"scanned_active": n, "gap_review_workbooks": gap_total, "unhandled_feature_types": len(un_rows),
+        return un_rows[min(top, len(un_rows)) - 1]["cumulative_gap_review_cleared"] if un_rows else 0
+    ms = {"scanned": n, "gap_review_workbooks": gap_total, "unhandled_feature_types": len(un_rows),
           "manual_feature_types": len(rows) - len(un_rows), "cleared_by_top1": cleared(1),
           "cleared_by_top5": cleared(5), "cleared_by_top10": cleared(10),
           "features_for_80pct_gap_review": next((r["gap_rank"] for r in un_rows
-                                                 if r["cum_pct_gap_review_cleared"] != ""
-                                                 and r["cum_pct_gap_review_cleared"] >= 80), ""),
+                                                 if r["cumulative_pct_gap_review_cleared"] != ""
+                                                 and r["cumulative_pct_gap_review_cleared"] >= 80), ""),
           "audit_unavailable_workbooks": len(stats.get((AUDIT_UNAVAILABLE, "unhandled"), {}).get("wbs", ()))}
     return rows, ms
 
@@ -286,7 +291,7 @@ def gap_breakdown(entries):
 def gap_entries(rows, cx, site=""):
     return [{"key": f"{site}|{r['workbook_luid']}" if site else r["workbook_luid"], "name": r["workbook"],
              "accesses": int(r["accesses"] or 0), "features": (cx.get(r["workbook_luid"]) or {}).get("features") or []}
-            for r in rows if r["recommended_path"] != "retire-candidate" and r["workbook_luid"] in cx]
+            for r in rows if r["workbook_luid"] in cx]
 
 
 def write_rows_csv(path, cols, rows):
@@ -313,7 +318,7 @@ def rebuild_gaps_all_sites(root, sites):
 
 
 def rebuild_pipeline_all_sites(root):
-    """Rank tables over every full-access site's active workbooks together."""
+    """Rank tables over every full-access site's workbooks together."""
     access = inv.site_access(root)
     wbs, meta, sites = [], {}, []
     for plan_path in sorted(root.glob("*/report-inventory/migration-plan.json")):
@@ -376,7 +381,7 @@ def main():
     for r in reports:
         w = wbs.setdefault(r["workbook_luid"], {
             "workbook_luid": r["workbook_luid"], "workbook": r["workbook"], "project": r["project"],
-            "owner": r["owner"], "reports": 0, "data_reports": 0, "active_reports": 0, "retire_candidates": 0,
+            "owner": r["owner"], "reports": 0, "data_reports": 0, "reports_in_use": 0, "retire_candidates": 0,
             "review": 0, "traffic_accesses": 0.0, "traffic_users_max": 0.0, "view_accesses": 0.0,
             "has_traffic": False, "readiness": set(), "statuses": Counter(), "tables": set(),
             "published": set(), "source_types": set(), "hosts": set(), "last_accessed": "",
@@ -387,7 +392,7 @@ def main():
             w["data_reports"] += 1
             w["statuses"][r["lineage_status"]] += 1
         if rc in ("no", "review"):
-            w["active_reports"] += 1
+            w["reports_in_use"] += 1
         w["retire_candidates"] += rc == "yes"
         w["review"] += rc == "review"
         if r.get("traffic_accesses") not in (None, ""):
@@ -413,10 +418,10 @@ def main():
         users = w["traffic_users_max"] if w["has_traffic"] else 1
         n_un, n_man, n_hint = (int(c.get(k) or 0) for k in ("n_unhandled", "n_manual", "n_hint"))
         score = round(acc * math.sqrt(max(users, 1)) / (1 + 10 * n_un + 3 * n_man + n_hint), 1)
-        all_retire = w["data_reports"] > 0 and w["retire_candidates"] == w["data_reports"]
-        if all_retire:
-            tag = "retire-candidate"
-        elif not c:
+        # Information only: retire candidates stay in the population until retirement is confirmed.
+        retire_flag = ("yes" if w["data_reports"] and w["retire_candidates"] == w["data_reports"]
+                       else "some reports" if w["retire_candidates"] else "no")
+        if not c:
             tag = "not-scanned"
         elif n_un:
             tag = "needs-gap-review"
@@ -426,9 +431,7 @@ def main():
             tag = "easy-win"
         else:
             tag = "moderate"
-        if all_retire:
-            path = "retire-candidate"
-        elif readiness == "needs-landing":
+        if readiness == "needs-landing":
             path = "land-data-first"
         elif n_un:
             path = "convert-with-gap-review"
@@ -441,14 +444,14 @@ def main():
             blockers.append(f"{n_man} manual feature(s)")
         if readiness in ("needs-mapping", "needs-landing"):
             blockers.append(readiness.replace("-", " "))
-        if cx and not c and not all_retire:
+        if cx and not c:
             blockers.append("not scanned (see twb-fetch-results.json / complexity-failures.json)")
         if c.get("formula_audit") == "unavailable":
             blockers.append("formula audit unavailable (parity understated)")
         rows.append({
             "workbook_luid": luid, "workbook": w["workbook"], "project": w["project"], "owner": w["owner"],
-            "reports": w["reports"], "data_reports": w["data_reports"], "active_reports": w["active_reports"],
-            "retire_candidates": w["retire_candidates"], "review": w["review"],
+            "reports": w["reports"], "data_reports": w["data_reports"], "reports_in_use": w["reports_in_use"],
+            "retire_candidate": retire_flag, "retire_candidate_reports": w["retire_candidates"], "review": w["review"],
             "accesses": int(acc), "users_at_least": int(w["traffic_users_max"]) if w["has_traffic"] else "",
             "last_accessed": w["last_accessed"],
             "parity_band": c.get("parity_band", ""), "predicted_parity_pct": c.get("predicted_parity_pct", ""),
@@ -462,21 +465,21 @@ def main():
         })
 
     # ---- clusters: shared published datasource first, then table overlap without hub tables
-    active = [r for r in rows if r["recommended_path"] != "retire-candidate" and r["data_reports"]]
-    freq = Counter(t for r in active for t in r["_tables"])
-    hub_n = max(10, math.ceil(len(active) * args.hub_pct / 100))
+    data_wbs = [r for r in rows if r["data_reports"]]  # every workbook that uses data
+    freq = Counter(t for r in data_wbs for t in r["_tables"])
+    hub_n = max(10, math.ceil(len(data_wbs) * args.hub_pct / 100))
     hubs = {t for t, n in freq.items() if n > hub_n}
     uf = UF()
     by_pub = defaultdict(list)
-    for r in active:
+    for r in data_wbs:
         uf.find(r["workbook_luid"])
         for p in r["_published"]:
             by_pub[p].append(r["workbook_luid"])
     for members in by_pub.values():
         for m in members[1:]:
             uf.union(members[0], m)
-    pub_clustered = {r["workbook_luid"] for r in active if r["_published"]}
-    rest = sorted([r for r in active if r["workbook_luid"] not in pub_clustered and r["_tables"] - hubs],
+    pub_clustered = {r["workbook_luid"] for r in data_wbs if r["_published"]}
+    rest = sorted([r for r in data_wbs if r["workbook_luid"] not in pub_clustered and r["_tables"] - hubs],
                   key=lambda r: -len(r["_tables"] - hubs))
     unassigned = list(rest)
     while unassigned:
@@ -491,7 +494,7 @@ def main():
                 keep.append(r)
         unassigned = keep
     groups = defaultdict(list)
-    for r in active:
+    for r in data_wbs:
         groups[uf.find(r["workbook_luid"])].append(r)
     clusters = []
     multi = sorted([g for g in groups.values() if len(g) > 1], key=lambda g: (-len(g), g[0]["workbook"] or ""))
@@ -503,7 +506,7 @@ def main():
                     key=READINESS.index, default="no-data")
         for m in g:
             m["cluster_id"] = cid
-        clusters.append({"cluster_id": cid, "workbooks": len(g), "active_reports": sum(m["active_reports"] for m in g),
+        clusters.append({"cluster_id": cid, "workbooks": len(g), "reports_in_use": sum(m["reports_in_use"] for m in g),
                          "accesses": sum(m["accesses"] for m in g),
                          "linked_by": "published datasource" if any(m["_published"] for m in g) else "shared tables",
                          "shared_published_datasources": len(shared_pub),
@@ -513,37 +516,36 @@ def main():
     cluster_wave = {c["cluster_id"]: c["suggested_wave"] for c in clusters}
     for r in rows:
         r.setdefault("cluster_id", "")
-        if r["recommended_path"] == "retire-candidate":
-            r["suggested_wave"] = "hold"
-        elif r["cluster_id"]:
+        if r["cluster_id"]:
             r["suggested_wave"] = cluster_wave[r["cluster_id"]]
         else:
             r["suggested_wave"] = WAVE_FOR.get(r["source_readiness"], "1")
-    rows.sort(key=lambda r: ({"1": 0, "2": 1, "3": 2, "hold": 3}[r["suggested_wave"]], -r["score"]))
+    rows.sort(key=lambda r: ({"1": 0, "2": 1, "3": 2}[r["suggested_wave"]], -r["score"]))
     for i, r in enumerate(rows, 1):
         r["priority_rank"] = i
 
     # ---- write
     cols = ["priority_rank", "suggested_wave", "cluster_id", "workbook", "project", "owner", "tag",
             "recommended_path", "score", "accesses", "users_at_least", "last_accessed", "reports", "data_reports",
-            "active_reports", "retire_candidates", "review", "parity_band", "predicted_parity_pct", "n_unhandled",
+            "reports_in_use", "retire_candidate", "retire_candidate_reports", "review", "parity_band", "predicted_parity_pct", "n_unhandled",
             "n_manual", "n_hint", "top_gaps", "source_readiness", "lineage_statuses", "source_types",
             "source_hosts", "published_datasources", "warehouse_tables", "blockers", "workbook_luid"]
     with open(dest / "workbooks.csv", "w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=cols, extrasaction="ignore", lineterminator="\n")
         w.writeheader()
         w.writerows(rows)
-    ccols = ["cluster_id", "suggested_wave", "workbooks", "active_reports", "accesses", "linked_by",
+    ccols = ["cluster_id", "suggested_wave", "workbooks", "reports_in_use", "accesses", "linked_by",
              "shared_published_datasources", "source_readiness", "shared_tables", "workbook_names"]
     with open(dest / "clusters.csv", "w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=ccols, lineterminator="\n")
         w.writeheader()
         w.writerows(clusters)
     tags, paths, waves = (Counter(r[k] for r in rows) for k in ("tag", "recommended_path", "suggested_wave"))
-    bands = Counter(r["parity_band"] for r in rows if r["parity_band"] and r["recommended_path"] != "retire-candidate")
-    readiness = Counter(r["source_readiness"] for r in rows if r["recommended_path"] != "retire-candidate")
-    summary = {"code_version": code_version(), "workbooks": len(rows), "tags": tags, "paths": paths,
-               "waves": waves, "parity_bands_active": bands, "readiness_active": readiness,
+    bands = Counter(r["parity_band"] for r in rows if r["parity_band"])
+    readiness = Counter(r["source_readiness"] for r in rows)
+    summary = {"code_version": code_version(), "workbooks": len(rows),
+               "retire_candidate_workbooks": sum(1 for r in rows if r["retire_candidate"] == "yes"), "tags": tags, "paths": paths,
+               "waves": waves, "parity_bands": bands, "readiness": readiness,
                "clusters": len(clusters), "clustered_workbooks": sum(c["workbooks"] for c in clusters),
                "hub_tables_ignored": sorted(hubs)[:50], "scanned": bool(cx)}
     # ---- pipeline priority
@@ -551,7 +553,7 @@ def main():
     pipe_wbs = [{"key": r["workbook_luid"], "name": r["workbook"], "site": out.name, "cluster": r["cluster_id"],
                  "tables": sorted(r["_tables"]), "accesses": r["accesses"], "weight": max(r["accesses"], 1),
                  "unlockable": r["source_readiness"] in ("in-snowflake", "warehouse-mapped")}
-                for r in rows if r["recommended_path"] != "retire-candidate" and r["_tables"]]
+                for r in rows if r["_tables"]]
     pipe_rows, ms = pipeline_priority([{**w, "tables": set(w["tables"])} for w in pipe_wbs], meta)
     write_pipeline_csv(dest / "pipeline-priority.csv", pipe_rows)
     plan = {"summary": {**summary, "pipelines": ms}, "clusters": clusters,
@@ -560,46 +562,48 @@ def main():
     (dest / "migration-plan.json").write_text(json.dumps(plan, indent=2, default=list))
 
     # ---- summary.csv section and the cross-site rollup
-    srows = [("workbooks", len(rows), "workbooks with at least one report"),
-             ("workbooks_active", sum(1 for r in rows if r["recommended_path"] != "retire-candidate"),
-              "at least one report in use or too new to judge")]
+    # Every workbook is in the population; retire-candidate counts are information only.
+    srows = [("workbooks", len(rows), "workbooks with at least one report (all in the migration population)"),
+             ("retire_candidate_workbooks", sum(1 for r in rows if r["retire_candidate"] == "yes"),
+              "information only: every data report is a retire candidate (not excluded until confirmed)"),
+             ("workbooks_with_retire_candidate_reports", sum(1 for r in rows if r["retire_candidate"] == "some reports"),
+              "information only: some, not all, data reports are retire candidates")]
     srows += [(f"path_{k}", paths.get(k, 0), d) for k, d in (
         ("convert", "convert directly"), ("convert-with-gap-review", "convert after reviewing unhandled features"),
-        ("land-data-first", "data must land in Snowflake before conversion"),
-        ("retire-candidate", "every data report is a retire candidate"))]
+        ("land-data-first", "data must land in Snowflake before conversion"))]
     srows += [(f"wave_{k}", waves.get(k, 0), d) for k, d in (
         ("1", "suggested wave 1: sources already in Snowflake"),
         ("2", "suggested wave 2: after pipelines reach Snowflake"),
-        ("3", "suggested wave 3: sources to map or land first"), ("hold", "retire candidates"))]
+        ("3", "suggested wave 3: sources to map or land first"))]
     if cx:
-        scanned = [r for r in rows if r["recommended_path"] != "retire-candidate" and r["parity_band"]]
+        scanned = [r for r in rows if r["parity_band"]]
         avg = round(sum(float(r["predicted_parity_pct"]) for r in scanned) / len(scanned), 1) if scanned else ""
-        srows += [("parity_scanned_active", len(scanned), "active workbooks with a complexity scan (step 05)"),
+        srows += [("parity_scanned", len(scanned), "workbooks with a complexity scan (step 05)"),
                   ("avg_predicted_parity_pct", avg,
-                   "average predicted parity of scanned active workbooks; across sites, weighted by workbooks"),
-                  ("unhandled_features_active", sum(int(r["n_unhandled"] or 0) for r in scanned),
-                   "distinct unhandled features, summed over scanned active workbooks"),
-                  ("manual_features_active", sum(int(r["n_manual"] or 0) for r in scanned),
-                   "distinct manual features, summed over scanned active workbooks")]
+                   "average predicted parity of scanned workbooks; across sites, weighted by workbooks"),
+                  ("unhandled_features", sum(int(r["n_unhandled"] or 0) for r in scanned),
+                   "distinct unhandled features, summed over scanned workbooks"),
+                  ("manual_features", sum(int(r["n_manual"] or 0) for r in scanned),
+                   "distinct manual features, summed over scanned workbooks")]
         srows += [(f"parity_band_{b}", bands.get(b, 0), d) for b, d in (
-            ("A", "active workbooks predicted >= 90% parity (drop-in)"), ("B", "75-90% (light touch-up)"),
+            ("A", "workbooks predicted >= 90% parity (drop-in)"), ("B", "75-90% (light touch-up)"),
             ("C", "50-75% (meaningful manual work)"), ("D", "< 50% (hard, re-author risk)"))]
     srows += [("data_model_clusters", len(clusters), "groups of workbooks that would share a Sigma data model"),
-              ("clustered_workbooks", summary["clustered_workbooks"], "active workbooks in a cluster")]
+              ("clustered_workbooks", summary["clustered_workbooks"], "workbooks in a cluster")]
     inv.replace_summary_section(dest, out.name, "workbooks", srows)
     inv.replace_summary_section(dest, out.name, "pipelines", [(k, v, PIPE_HELP[k]) for k, v in ms.items()])
     if cx:
         gap_rows, gms = gap_breakdown(gap_entries(rows, cx))
         write_rows_csv(dest / "gap-features.csv", GAP_COLS, gap_rows)
         inv.replace_summary_section(dest, out.name, "gaps", [(k, v, GAP_HELP[k]) for k, v in gms.items()])
-        top = ", ".join(f"{r['feature']} ({r['active_workbooks']})" for r in gap_rows if r["status"] == "unhandled")
+        top = ", ".join(f"{r['feature']} ({r['workbooks']})" for r in gap_rows if r["status"] == "unhandled")
         log(f"gaps: {gms['gap_review_workbooks']} gap-review workbooks, {gms['unhandled_feature_types']} unhandled "
             f"feature types; top 5 clear {gms['cleared_by_top5']}; most common: {top[:300]}")
     all_ms = rebuild_pipeline_all_sites(out.parent)
     inv.rebuild_cross_site(out)
     log(f"pipelines: {ms['tables_to_land']} tables to land; {ms['tables_for_50pct_usage'] or '-'} unlock half the "
         f"usage of {ms['unlockable_workbooks']} unlockable workbooks, {ms['tables_for_80pct_usage'] or '-'} unlock 80%; "
-        f"{ms['blocked_beyond_tables']} active workbooks also need non-table sources")
+        f"{ms['blocked_beyond_tables']} workbooks also need non-table sources")
     if all_ms.get("_gaps"):
         g = all_ms["_gaps"]
         log(f"all full-access sites: {g['gap_review_workbooks']} gap-review workbooks, {g['unhandled_feature_types']} "
@@ -609,7 +613,8 @@ def main():
         log(f"all full-access sites: {all_ms['tables_to_land']} tables to land; "
             f"{all_ms['tables_for_50pct_usage'] or '-'} for half the usage, {all_ms['tables_for_80pct_usage'] or '-'} "
             f"for 80% (output/_server/pipeline-priority-all-sites.csv)")
-    log(f"workbooks: {len(rows)} ({summary['workbooks'] - paths.get('retire-candidate', 0)} active); "
+    log(f"workbooks: {len(rows)} (all in the population; {summary['retire_candidate_workbooks']} are retire "
+        f"candidates, information only); "
         f"paths {dict(paths)}; waves {dict(waves)}; {len(clusters)} clusters "
         f"({summary['clustered_workbooks']} workbooks); {len(hubs)} hub tables ignored")
     log(f"Wrote workbooks.csv, clusters.csv, migration-plan.json to {dest}/")

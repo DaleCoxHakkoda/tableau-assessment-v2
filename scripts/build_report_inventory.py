@@ -968,7 +968,7 @@ PER_SITE_ONLY = {("site", "generated_at"), ("site", "site_role"), ("site", "fetc
                  ("usage_snapshots", "window_days"), ("usage_traffic", "window_days")}
 EARLIEST = {("usage_traffic", "window_start")}
 # Averages: combined across sites weighted by the count each one is taken over.
-WEIGHTED_AVG = {("workbooks", "avg_predicted_parity_pct"): ("workbooks", "parity_scanned_active")}
+WEIGHTED_AVG = {("workbooks", "avg_predicted_parity_pct"): ("workbooks", "parity_scanned")}
 LATEST = {("usage_traffic", "window_end"), ("site", "code_version")}
 
 
