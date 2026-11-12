@@ -242,6 +242,14 @@ workbooks, unhandled first, ranked by how many workbooks have it.
 | `sole_unhandled_for` | Workbooks where it is the only unhandled feature. |
 | `cumulative_gap_review_cleared`, `cumulative_pct_gap_review_cleared` | Gap-review workbooks whose unhandled features are all within the top N: the ones a known Sigma pattern for those N would clear. |
 
+Sigma's scanner reports every refused calculated field as its own feature, named after the
+field, so no two workbooks would share one. Step 11 regroups refused formulas by cause,
+from each workbook's `gaps/<luid>/formula-audit.json`: the converter's refusal reason
+(`Formula: LOD expression not converted`) and any Tableau function it does not translate
+(`Function not converted: WINDOW_SUM (table_calc)`). One formula can count under several
+causes; a formula with neither is `Formula refused, no reason recorded`. The grouping is
+in `scripts/lib/gap_categories.py`.
+
 `output/_server/gap-features-all-sites.csv` ranks across all full-access sites, and the
 `gaps` section of the rollup gives `cleared_by_top5`, `cleared_by_top10` and
 `features_for_80pct_gap_review` from it. `audit_unavailable_workbooks` should be 0; if not,

@@ -44,7 +44,11 @@ cumulative columns then read "landing the first N tables unlocks X% of usage".
 It is an anchor for the pipeline conversation, not a plan: it knows nothing yet about
 the pipelines (Talend jobs) behind each table.
 
-Gap features: which unhandled (and manual) Tableau features recur across the estate.
+Gap features: which unhandled (and manual) Tableau features recur across the estate. The
+scanner reports each refused calculated field as its own feature (named after the field),
+so refused formulas are regrouped by cause first: the converter's refusal reason and any
+Tableau function it does not translate (lib/gap_categories.py, from gaps/<luid>/
+formula-audit.json). Other features keep the scanner's name.
 A workbook is tagged needs-gap-review for ANY unhandled feature, so the count alone hides
 whether that is hundreds of distinct problems or a few repeated ones. Unhandled features are
 ranked by how many workbooks have them; cumulative_gap_review_cleared counts the gap-review
@@ -74,6 +78,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import build_report_inventory as inv  # noqa: E402
+from lib.gap_categories import categorized_features  # noqa: E402
 from lib.hosts import normalize_host  # noqa: E402
 from lib.tableau_client import add_site_args, code_version, log, resolve_site_args  # noqa: E402
 
@@ -196,6 +201,7 @@ PIPE_COLS = ["pipeline_rank", "table_key", "connection_type", "host", "workbooks
              "workbooks_unlocked_now", "cumulative_workbooks_unlocked", "cumulative_pct_unlockable_workbooks",
              "cumulative_accesses_unlocked", "cumulative_pct_unlockable_accesses", "clusters", "example_workbooks"]
 PIPE_HELP = {
+    "untraced_workbooks": "workbooks that use data but have no traced warehouse tables (to investigate; not in the ranking)",
     "tables_to_land": "warehouse tables the workbooks use that are not yet in Snowflake",
     "tables_already_in_snowflake": "tables the workbooks use that are already in Snowflake",
     "unlockable_workbooks": "workbooks whose only data dependency is warehouse tables",
@@ -288,9 +294,12 @@ def gap_breakdown(entries):
     return rows, ms
 
 
-def gap_entries(rows, cx, site=""):
+def gap_entries(rows, cx, site_dir, site=""):
+    """Scanned workbooks with their features; refused formulas grouped by cause (lib/gap_categories)."""
     return [{"key": f"{site}|{r['workbook_luid']}" if site else r["workbook_luid"], "name": r["workbook"],
-             "accesses": int(r["accesses"] or 0), "features": (cx.get(r["workbook_luid"]) or {}).get("features") or []}
+             "accesses": int(r["accesses"] or 0),
+             "features": categorized_features((cx.get(r["workbook_luid"]) or {}).get("features") or [],
+                                              Path(site_dir) / "gaps" / r["workbook_luid"])}
             for r in rows if r["workbook_luid"] in cx]
 
 
@@ -309,7 +318,7 @@ def rebuild_gaps_all_sites(root, sites):
             continue
         cx = json.loads(cxp.read_text(encoding="utf-8"))
         with open(wbp, encoding="utf-8") as fh:
-            entries += gap_entries(list(csv.DictReader(fh)), cx, site)
+            entries += gap_entries(list(csv.DictReader(fh)), cx, root / site, site)
     if not entries:
         return {}
     rows, ms = gap_breakdown(entries)
@@ -555,6 +564,8 @@ def main():
                  "unlockable": r["source_readiness"] in ("in-snowflake", "warehouse-mapped")}
                 for r in rows if r["_tables"]]
     pipe_rows, ms = pipeline_priority([{**w, "tables": set(w["tables"])} for w in pipe_wbs], meta)
+    # Workbooks that use data but have no traced tables: the investigation worklist, outside the ranking.
+    ms["untraced_workbooks"] = sum(1 for r in rows if r["data_reports"] and not r["_tables"])
     write_pipeline_csv(dest / "pipeline-priority.csv", pipe_rows)
     plan = {"summary": {**summary, "pipelines": ms}, "clusters": clusters,
             "workbooks": [{k: v for k, v in r.items() if not k.startswith("_")} for r in rows],
@@ -593,7 +604,7 @@ def main():
     inv.replace_summary_section(dest, out.name, "workbooks", srows)
     inv.replace_summary_section(dest, out.name, "pipelines", [(k, v, PIPE_HELP[k]) for k, v in ms.items()])
     if cx:
-        gap_rows, gms = gap_breakdown(gap_entries(rows, cx))
+        gap_rows, gms = gap_breakdown(gap_entries(rows, cx, out))
         write_rows_csv(dest / "gap-features.csv", GAP_COLS, gap_rows)
         inv.replace_summary_section(dest, out.name, "gaps", [(k, v, GAP_HELP[k]) for k, v in gms.items()])
         top = ", ".join(f"{r['feature']} ({r['workbooks']})" for r in gap_rows if r["status"] == "unhandled")
