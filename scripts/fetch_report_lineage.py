@@ -80,7 +80,7 @@ query($first: Int!, $after: String) {
     pageInfo { hasNextPage endCursor }
     nodes {
       id name query isUnsupportedCustomSql
-      database { id name connectionType }
+      database { id name connectionType ... on DatabaseServer { hostName } }
       __CUSTOM_SQL_TABLES__
       downstreamDatasources { id }
       downstreamSheets { id }

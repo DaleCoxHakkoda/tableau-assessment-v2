@@ -148,14 +148,56 @@ def table_keys(ts):
 
 
 # Best-effort FROM/JOIN extraction for custom SQL Tableau couldn't parse.
-SQL_KW = {"SELECT", "LATERAL", "TABLE", "UNNEST", "VALUES"}
+# Words that can follow FROM/JOIN without being a table.
+SQL_KW = {"SELECT", "LATERAL", "TABLE", "UNNEST", "VALUES", "CASE", "CAST", "WHEN", "THEN", "ELSE", "END",
+          "NULL", "ONLY", "DUAL", "CURRENT_DATE", "CURRENT_TIMESTAMP", "NOW", "INTERVAL", "DATE", "TIMESTAMP"}
+# A parenthesis opened right after one of these starts a subquery, not a function call.
+CLAUSE_KW = {"FROM", "JOIN", "IN", "EXISTS", "AS", "ON", "WHERE", "AND", "OR", "NOT", "SELECT", "UNION", "ALL",
+             "ANY", "SOME", "LATERAL", "WHEN", "THEN", "ELSE", "HAVING", "BY", "USING", "WITH", "INTERSECT",
+             "EXCEPT", "MINUS", "VALUES", "RETURN"}
+
+
+def _inside_function(body, pos):
+    """True when pos sits inside a function call's own arguments, e.g. the FROM in
+    EXTRACT(YEAR FROM dt), SUBSTRING(s FROM 1 FOR 3) or TRIM(BOTH ' ' FROM x): there FROM is
+    the function's grammar and what follows is a column or value, never a data source.
+    A parenthesis that opens a subquery (its content starts with SELECT or WITH, as in
+    ARRAY(SELECT code FROM ref.dx_codes)) is not a function's arguments: its tables count."""
+    depth = 0
+    for i in range(pos - 1, -1, -1):
+        ch = body[i]
+        if ch == ")":
+            depth += 1
+        elif ch == "(":
+            if depth == 0:
+                if re.match(r"\s*(SELECT|WITH)\b", body[i + 1:], flags=re.I):
+                    return False
+                m = re.search(r"([A-Za-z_][\w$]*)\s*$", body[:i])
+                return bool(m) and m.group(1).upper() not in CLAUSE_KW
+            depth -= 1
+    return False
 
 
 def regex_tables(sql):
+    return regex_sources(sql)[0]
+
+
+def regex_sources(sql):
+    """(tables, functions) read FROM/JOIN in custom SQL. A name followed by "(" there is a
+    table function (a UDF such as edw.fn_member_months(...), or generate_series(...)): it is
+    reported as a function to rebuild in Snowflake, not as a table to land."""
     body = re.sub(r"--[^\n]*|/\*.*?\*/", " ", sql or "", flags=re.S)
+    body = re.sub(r"'(?:[^']|'')*'", "''", body)  # string literals cannot hold table names
     ctes = {m.upper() for m in re.findall(r"(?:WITH|,)\s*([A-Za-z_][\w$]*)\s+AS\s*\(", body, flags=re.I)}
-    found = (clean(t).upper() for t in re.findall(r'\b(?:FROM|JOIN)\s+([\w$."\[\]`]+)', body, flags=re.I))
-    return uniq(t for t in found if t and not t.startswith("(") and t not in SQL_KW and t not in ctes)
+    found, funcs = [], []
+    for m in re.finditer(r'\b(?:FROM|JOIN)\s+([\w$."\[\]`]+)(\s*\()?', body, flags=re.I):
+        t = clean(m.group(1)).upper()
+        last = t.split(".")[-1]
+        if (not t or t.startswith("(") or t in ctes or last in SQL_KW or re.fullmatch(r"[\d.]+", t)
+                or _inside_function(body, m.start())):
+            continue
+        (funcs if m.group(2) else found).append(t)
+    return uniq(found), uniq(funcs)
 
 
 # Usage columns that exist only for one usage source; dropped from the CSVs for the other.
@@ -320,7 +362,7 @@ def main():
     # REST connections (step 03b) for datasources the Metadata API left blank.
     wc = load_json(out_dir, "workbook-connections.json") or {}
     wb_conns, pds_conns = wc.get("workbooks") or {}, wc.get("datasources") or {}
-    filled = {"published": 0, "embedded": 0}
+    filled = {"published": 0, "embedded": 0, "hosts": 0}
     for p in published.values():
         if not p["db_types"] and not p["tables"] and p["luid"] in pds_conns:
             conns = pds_conns[p["luid"]]
@@ -328,6 +370,12 @@ def main():
             p["hosts"] = hosts_of(conns, "server_address")
             p["source_info"] = "rest"
             filled["published"] += bool(p["db_types"])
+        elif not p["hosts"] and p["luid"] in pds_conns:
+            # The Metadata API knew the database but not its server (seen with Greenplum, ODBC
+            # and some extracts); REST connections often still carry the server address.
+            p["hosts"] = hosts_of([c for c in pds_conns[p["luid"]]
+                                   if (c.get("type") or "").lower() != "sqlproxy"], "server_address")
+            filled["hosts"] += bool(p["hosts"])
 
     # ---- custom SQL
     custom_sql = {}
@@ -339,19 +387,28 @@ def main():
             conf = "restricted"
         elif not parsed:
             db = clean(dig(c, "database", "name")).upper()
-            parsed = [t if t.count(".") >= 2 or not db else f"{db}.{t}" for t in regex_tables(c.get("query"))]
-            for k in parsed:
-                parts = k.split(".")
+            host = nh(dig(c, "database", "hostName"))
+            parsed = []
+            reg_tables, reg_funcs = regex_sources(c.get("query"))
+            for t in reg_tables:
+                parts = t.split(".")
+                if len(parts) >= 3:
+                    d, sch, name = parts[-3], parts[-2], parts[-1]
+                elif len(parts) == 2:
+                    d, sch, name = db or None, parts[0], parts[1]
+                else:  # unqualified: the custom SQL's own database, default schema
+                    d, sch, name = db or None, None, parts[0]
+                k = ".".join(x for x in (d, sch, name) if x)
+                parsed.append(k)
                 TABLES.setdefault(k, {
-                    "table_key": k,
-                    "database": parts[-3] if len(parts) >= 3 else None,
-                    "schema": parts[-2] if len(parts) >= 2 else None,
-                    "table": parts[-1],
-                    "connection_type": dig(c, "database", "connectionType"),
+                    "table_key": k, "database": d, "schema": sch, "table": name,
+                    "connection_type": dig(c, "database", "connectionType"), "host": host,
                 })
-            conf = "regex" if parsed else "unparsed"
+            parsed = uniq(parsed)
+            conf = "regex" if parsed else "table-function" if reg_funcs else "unparsed"
         custom_sql[c["id"]] = {
             "id": c["id"], "name": c.get("name"), "tables": parsed, "confidence": conf,
+            "table_functions": regex_sources(c.get("query"))[1],
             "unsupported": c.get("isUnsupportedCustomSql"), "query": c.get("query"),
         }
         for d in c.get("downstreamDatasources") or []:
@@ -416,6 +473,21 @@ def main():
                     rec["hosts"] = hosts_of(hit, "server_address")
                     rec["source_info"] = "rest"
                     filled["embedded"] += bool(rec["db_types"])
+            elif not rec["hosts"] and rec["db_types"] and conns and not rec["published"]:
+                # Database known, server not: take it from REST, by datasource name, else from the
+                # workbook's connections of the same type when they all point at one server.
+                # sqlproxy connections point at Tableau Server (a published datasource), never
+                # at the database, so they are not used; published datasources get their host
+                # from their own connections above.
+                hit = [c for c in conns_by_name.get(clean(ed.get("name")).lower()) or []
+                       if (c.get("type") or "").lower() != "sqlproxy"]
+                if not hit:
+                    same = [c for cs in conns_by_name.values() for c in cs
+                            if (c.get("type") or "").lower() in rec["db_types"]]
+                    hit = same if len(set(hosts_of(same, "server_address"))) == 1 else None
+                if hit:
+                    rec["hosts"] = hosts_of(hit, "server_address")
+                    filled["hosts"] += bool(rec["hosts"])
         # A workbook with exactly one still-unknown datasource and leftover unmatched connections:
         # those connections can only belong to it.
         still = [r for r in emb.values() if not r["db_types"] and not r["tables"]]
@@ -647,6 +719,7 @@ def main():
               "table_key database schema table connection_type host n_reports n_workbooks "
               "n_datasources sum_wb_accesses sum_report_accesses read_by_prep_flows".split())
     write_csv("custom_sql.csv", [{**c, "tables": "; ".join(c["tables"]),
+                                  "table_functions": "; ".join(c.get("table_functions") or []),
                                   "query": re.sub(r"\s+", " ", c["query"] or "")} for c in custom_sql.values()])
 
     nodes, edges = [], []
@@ -749,6 +822,8 @@ def write_summary(out_dir, dest, reports, unpublished, datasources, custom_sql, 
         add("datasources", k, kinds.get(k, 0))
     add("datasources", "with_extracts", sum(1 for d in datasources.values() if d.get("extract")))
     if had_wc:
+        add("datasources", "hosts_filled_by_rest", filled["hosts"],
+            "database known from the Metadata API but not its server; server address taken from step 03b")
         add("datasources", "sources_filled_by_rest", filled["embedded"] + filled["published"],
             "unknown sources resolved by step 03b")
 
@@ -758,10 +833,14 @@ def write_summary(out_dir, dest, reports, unpublished, datasources, custom_sql, 
     add("lineage", "warehouse_tables", len(TABLES))
     confs = Counter(c["confidence"] for c in custom_sql.values())
     add("lineage", "custom_sql_blocks", len(custom_sql))
-    for k in ("tableau", "regex", "unparsed", "restricted"):
-        add("lineage", f"custom_sql_{k}", confs.get(k, 0),
+    for k in ("tableau", "regex", "table-function", "unparsed", "restricted"):
+        add("lineage", f"custom_sql_{k.replace('-', '_')}", confs.get(k, 0),
             {"tableau": "tables parsed by Tableau", "regex": "tables parsed by FROM/JOIN extraction",
+             "table-function": "reads only table functions (UDFs) in FROM/JOIN: rebuild in Snowflake",
              "unparsed": "needs manual review", "restricted": "not visible to the PAT owner"}[k])
+    add("lineage", "custom_sql_with_table_functions",
+        sum(1 for c in custom_sql.values() if c.get("table_functions")),
+        "custom SQL blocks calling table functions in FROM/JOIN (custom_sql.csv table_functions)")
 
     by_type, by_host = Counter(), Counter()
     for r in data:

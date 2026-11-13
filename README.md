@@ -356,7 +356,7 @@ All in `output/<site>/report-inventory/`:
 | `tables.csv` | one row per warehouse table | The dependent-models list. Report, workbook and datasource fan-in, total report accesses, and any Prep flows that read the table. |
 | `edges_report_datasource.csv` | report × datasource | Graph edges. Embedded datasources that proxy a published one carry its LUID. |
 | `edges_datasource_table.csv` | datasource × table | Graph edges, with `via` = `direct`, `custom_sql:tableau` or `custom_sql:regex`. |
-| `custom_sql.csv` | one row per custom SQL block | Tables parsed by Tableau where it can, regex FROM/JOIN extraction where it cannot, `unparsed` for manual review. |
+| `custom_sql.csv` | one row per custom SQL block | Tables parsed by Tableau where it can, regex FROM/JOIN extraction where it cannot, `unparsed` for manual review. The regex skips `FROM` that is a function's own grammar (`EXTRACT(YEAR FROM dt)`, `SUBSTRING(s FROM 1)`, `TRIM(... FROM x)`: what follows is a column or value, not a source), string literals, CTE names and keywords such as `CASE`; a subquery inside a function, as in `ARRAY(SELECT code FROM ref.dx_codes)`, still counts. A name called like a function in `FROM`/`JOIN` (a UDF such as `edw.fn_member_months(...)`, or `generate_series(...)`) goes in `table_functions`, not `tables`: it is rebuilt in Snowflake, not landed. A block whose only sources are table functions has confidence `table-function`. Full query text stays in `query` for SQL translation. An unqualified table is recorded under the custom SQL's own database (`database` set, `schema` blank) with that database's host. |
 | `host-aliases.csv` | one row per raw host spelling | How each host name seen was normalized, so the collapsing can be checked. |
 | `summary.csv` | one row per metric | The run's headline numbers (inventory, datasources, lineage status, source types and hosts, snapshot and traffic usage, including the count of candidates to retire) as `site, section, metric, value, description`. Paste or import into a workbook. |
 | `lineage-graph.json` | nodes + edges | Load into a graph tool or stitch to the pipeline DAG. |
@@ -441,6 +441,12 @@ a six-month window: confirm with the `owner` before acting. `summary.csv` counts
 value under the `retire` section.
 
 ### Host names
+
+When the Metadata API knows a datasource's database but returns no server (seen with
+Greenplum, ODBC connections and some extracts), step 10 takes the server address from the
+REST connections fetched by step 03b. Connections of type `sqlproxy` are skipped: they point
+at Tableau Server (a published datasource), not at the database. The count is
+`datasources, hosts_filled_by_rest` in `summary.csv`.
 
 The same server is spelled many ways across workbooks, so step 10 normalizes every host
 before counting it (`scripts/lib/hosts.py`): lower-case; drop a trailing port (`,1433`,
