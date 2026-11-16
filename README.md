@@ -393,6 +393,42 @@ datasources (extract with no connection info, proxy to an unresolved published d
 the Parameters pseudo-datasource, dashboards with no member sheets, and so on), prints
 counts with examples, and writes `report-inventory/lineage-diagnosis.csv`.
 
+### Tables across sites, and the migration master list
+
+Step 10 also writes `output/_server/tables-all-sites.csv`: one row per distinct schema +
+table across every site's `tables.csv` (names compared without quotes or brackets, upper
+case; the database is not part of the key because it is often blank). Each row lists the
+sites, databases, connection types and hosts it was seen with, and usage. Usage adds up
+per site and per table, so a workbook reading five tables counts toward all five: rank by
+it, do not total it.
+
+To check which of those tables are already migrated, compare it with the master list
+(a CSV; save an Excel sheet as CSV first):
+
+```bash
+python scripts/compare_tables.py --master greenplum_master.csv \
+    --schema-col SRC_SCHEMA --table-col SRC_TABLE --status-col MIGRATED --target-col SNOWFLAKE_TABLE \
+    [--only-schemas EDW,STAGE]
+```
+
+Common column names are found without the `--…-col` options. Each table gets a `match`:
+`schema+table`; `table only (N)` when the name appears in the master list under N other
+schemas (typical for unqualified names in custom SQL; an engineer confirms which); or
+`none`. The master list's status and target columns are copied as they are. Writes
+`output/_server/tables-vs-master.csv`, busiest tables first: the worklist for "migrated:
+map source to target" versus "not migrated: build the pipeline". `--only-schemas` keeps
+tables from other platforms out of the `none` count.
+
+To see why tables in `tables.csv` have no `connection_type`, `host` or `database`, run
+`python scripts/diagnose_tables.py --site <site>` (or `--schema EDW`, `--table CLAIMS` to
+pick tables another way). All three come from the database object the Metadata API links a
+table to, so all three are blank when that link is missing. For each table it traces the
+datasources and workbooks that use it and shows, side by side, the REST connection from
+step 03b (type, server) and the workbook file's own connection from step 04 (class, server,
+dbname, schema, ODBC DSN, Initial SQL). For a published datasource it shows the published
+datasource's connection, not the workbook's `sqlproxy` link to Tableau Server. Writes
+`report-inventory/table-diagnosis.csv`; no Tableau calls.
+
 ### Usage columns: which to read
 
 `reports.csv` carries only the usage columns your deployment can fill. On Tableau Server:
@@ -580,6 +616,8 @@ scripts/
   workbook_priority.py         11
   consolidation.py             12
   diagnose_lineage.py          groups unresolved lineage by pattern
+  diagnose_tables.py           traces tables with no type, host or database to their connections
+  compare_tables.py            tables used across sites vs a migration master list
   run_sites.py                 multi-site runner
 vendor/tableau-to-sigma/       Sigma's gap scanner and converter helpers, unmodified (VENDORED.md)
 output/
