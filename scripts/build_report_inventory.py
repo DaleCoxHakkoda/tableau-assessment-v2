@@ -580,7 +580,8 @@ def main():
             target.append({
                 "report_id": rid, "report_luid": luid, "report_name": name, "report_type": rtype,
                 "workbook_luid": wb.get("luid"), "workbook": wb.get("name"), "project": wb.get("projectName"),
-                "owner": dig(wb, "owner", "email"), "workbook_updated": wb.get("updatedAt"),
+                "owner": dig(wb, "owner", "email") or dig(wb, "owner", "username"),
+                "owner_username": dig(wb, "owner", "username"), "workbook_updated": wb.get("updatedAt"),
                 "sheet_count": len(members),
                 "datasources": "; ".join(uniq(r["name"] for r in recs if r.get("name"))),
                 "published_datasources": "; ".join(pub_names),
@@ -1007,8 +1008,11 @@ def rebuild_cross_site(out_dir):
             for k in keys:
                 wr.writerow([kind, k[1], totals[k]] + [val.get((k[0], k[1], s), "") for s in in_total])
     n_tables = write_tables_all_sites(root, server)
+    n_owners = write_user_rollup(root, server)
     log(f"Summary: {out_dir / 'report-inventory' / 'summary.csv'}; rollup across {len(in_total)} site(s): {server / 'summary-rollup.csv'} "
-        f"(source types and hosts: summary-sources.csv; {n_tables} distinct schema.table: tables-all-sites.csv)")
+        f"(source types and hosts: summary-sources.csv; {n_tables} distinct host + schema + table: "
+        f"tables-all-sites.csv, grouped by name: tables-all-sites-grouped-hosts.csv; "
+        f"{n_owners} owner/site rows: user_rollup.csv)")
     cov = {m: v for m, v, _, _ in coverage}
     if cov.get("sites_pending_access"):
         log(f"Coverage: {cov['workbooks_assessed']} workbooks assessed, {cov['workbooks_not_assessed']} not assessed "
@@ -1060,53 +1064,117 @@ def _num(v):
         return None
 
 
+def write_user_rollup(root, server):
+    """output/_server/user_rollup.csv: one row per workbook owner and site, from every site's
+    reports.csv. owner is the owner's email (username when Tableau has no email). The counts
+    after report_count are information for the owner conversations, not filters: every
+    workbook stays in the migration population."""
+    access = site_access(root)
+    agg = {}
+    for p in sorted(root.glob("*/report-inventory/reports.csv")):
+        site = p.parent.parent.name
+        if site.startswith("_"):
+            continue
+        with open(p, encoding="utf-8") as fh:
+            for r in csv.DictReader(fh):
+                owner = (r.get("owner") or "").strip() or "(unknown)"
+                a = agg.setdefault((owner.lower(), site), {
+                    "owner": owner, "usernames": set(), "workbooks": set(), "reports": 0,
+                    "in_use": 0, "retire": 0, "projects": set()})
+                a["usernames"].add(r.get("owner_username") or "")
+                a["workbooks"].add(r.get("workbook_luid") or r.get("workbook") or "")
+                a["projects"].add(r.get("project") or "")
+                a["reports"] += 1
+                a["in_use"] += r.get("retire_candidate") in ("no", "review")
+                a["retire"] += r.get("retire_candidate") == "yes"
+    rows = [{"owner": a["owner"], "site": site, "workbook_count": len(a["workbooks"]),
+             "report_count": a["reports"], "owner_username": "; ".join(sorted(u for u in a["usernames"] if u)),
+             "reports_in_use": a["in_use"], "retire_candidate_reports": a["retire"],
+             "projects": "; ".join(sorted(x for x in a["projects"] if x))[:500],
+             "site_access": access.get(site, {}).get("access", "")}
+            for (_, site), a in agg.items()]
+    rows.sort(key=lambda r: (r["owner"].lower(), r["site"].lower()))
+    if rows:
+        with open(server / "user_rollup.csv", "w", newline="", encoding="utf-8") as fh:
+            w = csv.DictWriter(fh, fieldnames=list(rows[0]), lineterminator="\n")
+            w.writeheader()
+            w.writerows(rows)
+    return len(rows)
+
+
 def norm_name(v):
     """Identifier for matching: quotes and brackets off, trimmed, upper case."""
     return re.sub(r'["`\[\]]', "", v or "").strip().upper()
 
 
 def write_tables_all_sites(root, server):
-    """output/_server/tables-all-sites.csv: one row per distinct schema + table across every
-    site's tables.csv (the database is left out of the key: it is often blank, and schema
-    names identify Greenplum tables on their own). Usage columns add up per site, so a
-    workbook reading several tables counts toward each: use them to rank, not as totals."""
+    """Two lists of the tables used across every site's tables.csv, names compared without
+    quotes or brackets and upper-cased; the database is left out of the key (it is often
+    blank, which would split one table into a with- and a without-database row).
+
+      tables-all-sites.csv                one row per host + schema + table: the list to count
+                                          and compare from. n_hosts_for_name >= 2 flags the same
+                                          schema + table on other hosts (possible duplicate).
+      tables-all-sites-grouped-hosts.csv  one row per schema + table, hosts listed together:
+                                          for spotting names that appear on several hosts.
+
+    Usage columns add up per site, so a workbook reading several tables counts toward each:
+    use them to rank, not as totals. Returns the row count of the per-host list."""
     access = site_access(root)
-    agg = {}
+    per_host, grouped = {}, {}
+
+    def bucket(agg, key):
+        return agg.setdefault(key, {"databases": set(), "types": set(), "hosts": set(), "sites": set(),
+                                    "keys": set(), "reports": 0, "workbooks": 0, "accesses": 0})
     for p in sorted(root.glob("*/report-inventory/tables.csv")):
         site = p.parent.parent.name
         if site.startswith("_"):
             continue
         with open(p, encoding="utf-8") as fh:
             for t in csv.DictReader(fh):
-                key = (norm_name(t.get("schema")), norm_name(t.get("table")))
-                if not key[1]:
+                schema, table = norm_name(t.get("schema")), norm_name(t.get("table"))
+                if not table:
                     continue
-                a = agg.setdefault(key, {"databases": set(), "types": set(), "hosts": set(), "sites": set(),
-                                         "keys": set(), "reports": 0, "workbooks": 0, "accesses": 0})
-                a["databases"].add(norm_name(t.get("database")))
-                a["types"].add(t.get("connection_type") or "")
-                a["hosts"].add(t.get("host") or "")
-                a["sites"].add(site)
-                a["keys"].add(t.get("table_key") or "")
-                for col, k in (("n_reports", "reports"), ("n_workbooks", "workbooks"), ("sum_wb_accesses", "accesses")):
-                    a[k] += int(_num(t.get(col)) or 0)
+                host = (t.get("host") or "").strip().lower()
+                for a in (bucket(per_host, (host, schema, table)), bucket(grouped, (schema, table))):
+                    a["databases"].add(norm_name(t.get("database")))
+                    a["types"].add(t.get("connection_type") or "")
+                    a["hosts"].add(host)
+                    a["sites"].add(site)
+                    a["keys"].add(t.get("table_key") or "")
+                    for col, k in (("n_reports", "reports"), ("n_workbooks", "workbooks"),
+                                   ("sum_wb_accesses", "accesses")):
+                        a[k] += int(_num(t.get(col)) or 0)
 
     def j(vals):
         return "; ".join(sorted(v for v in vals if v))
-    rows = [{"schema": k[0], "table": k[1], "databases": j(a["databases"]), "connection_types": j(a["types"]),
-             "hosts": j(a["hosts"]), "n_sites": len(a["sites"]), "sites": j(a["sites"]),
-             "only_on_partial_sites": "yes" if all(access.get(x, {}).get("access", "FULL") != "FULL"
-                                                   for x in a["sites"]) else "",
-             "n_reports": a["reports"], "n_workbooks": a["workbooks"], "sum_wb_accesses": a["accesses"],
-             "table_keys": j(a["keys"])}
-            for k, a in agg.items()]
-    rows.sort(key=lambda r: (-r["sum_wb_accesses"], -r["n_workbooks"], r["schema"], r["table"]))
-    if rows:
-        with open(server / "tables-all-sites.csv", "w", newline="", encoding="utf-8") as fh:
-            w = csv.DictWriter(fh, fieldnames=list(rows[0]), lineterminator="\n")
-            w.writeheader()
-            w.writerows(rows)
-    return len(rows)
+
+    def tail(a):
+        return {"n_sites": len(a["sites"]),
+                "only_on_partial_sites": "yes" if all(access.get(x, {}).get("access", "FULL") != "FULL"
+                                                      for x in a["sites"]) else "",
+                "n_reports": a["reports"], "n_workbooks": a["workbooks"], "sum_wb_accesses": a["accesses"],
+                "table_keys": j(a["keys"]), "sites": j(a["sites"])}
+
+    def order(rows):
+        rows.sort(key=lambda r: (-r["sum_wb_accesses"], -r["n_workbooks"], r["schema"], r["table"]))
+        return rows
+
+    # A blank host is not counted as another host: it is unknown, not different.
+    n_hosts = {k: len({h for h in a["hosts"] if h}) for k, a in grouped.items()}
+    host_rows = order([{"connection_types": j(a["types"]), "host": k[0], "databases": j(a["databases"]),
+                        "schema": k[1], "table": k[2], "n_hosts_for_name": n_hosts[(k[1], k[2])], **tail(a)}
+                       for k, a in per_host.items()])
+    grouped_rows = order([{"connection_types": j(a["types"]), "hosts": j(a["hosts"]), "n_hosts": n_hosts[k],
+                           "databases": j(a["databases"]), "schema": k[0], "table": k[1], **tail(a)}
+                          for k, a in grouped.items()])
+    for name, rows in (("tables-all-sites.csv", host_rows), ("tables-all-sites-grouped-hosts.csv", grouped_rows)):
+        if rows:
+            with open(server / name, "w", newline="", encoding="utf-8") as fh:
+                w = csv.DictWriter(fh, fieldnames=list(rows[0]), lineterminator="\n")
+                w.writeheader()
+                w.writerows(rows)
+    return len(host_rows)
 
 
 def site_access(root):

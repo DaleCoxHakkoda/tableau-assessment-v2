@@ -5,6 +5,7 @@ Usage:
     python scripts/diagnose_tables.py --site <site>                  # tables with no type, host or database
     python scripts/diagnose_tables.py --site <site> --schema EDW     # or every table in a schema
     python scripts/diagnose_tables.py --site <site> --table CLAIMS   # or tables whose key contains a text
+    python scripts/diagnose_tables.py --all-sites [--schema EDW]     # every site, one combined file
 
 tables.csv takes connection_type, host and database from the database object the Metadata
 API links each table to. When all three are blank, that link was missing, and the answer is
@@ -33,7 +34,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from lib.tableau_client import add_site_args, log, resolve_site_args  # noqa: E402
+from lib.tableau_client import REPO_ROOT, add_site_args, log, resolve_site_args  # noqa: E402
 
 CONN_ATTRS = ("class", "server", "dbname", "schema", "port", "odbc-dsn", "odbc-connect-string-extras", "username")
 SKIP_CLASSES = {"federated"}  # the wrapper Tableau puts around a datasource's real connections
@@ -67,17 +68,20 @@ def twb_connections(twb_text, ds_name):
     return out, initial_sql
 
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    add_site_args(ap)
-    ap.add_argument("--schema", help="every table in this schema (case-insensitive)")
-    ap.add_argument("--table", help="tables whose key contains this text (case-insensitive)")
-    args = ap.parse_args()
-    site, out = resolve_site_args(args)
+def write_rows(dest, rows):
+    with open(dest, "w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=list(rows[0]), lineterminator="\n")
+        w.writeheader()
+        w.writerows(rows)
+
+
+def diagnose_site(out, args):
+    """Rows of table-diagnosis.csv for one site folder (also written into it)."""
     inv = out / "report-inventory"
     tables = read_csv(inv / "tables.csv")
     if not tables:
-        sys.exit(f"missing {inv / 'tables.csv'}; run step 10 first")
+        log(f"{out.name}: no tables.csv (run step 10 first)")
+        return []
     if args.schema:
         pick = [t for t in tables if (t["schema"] or "").upper() == args.schema.upper()]
         what = f"schema {args.schema}"
@@ -87,9 +91,9 @@ def main():
     else:
         pick = [t for t in tables if not (t["connection_type"] or t["host"] or t["database"])]
         what = "tables with no connection type, host or database"
-    log(f"{len(pick)} {what}")
+    log(f"{out.name}: {len(pick)} {what}")
     if not pick:
-        return
+        return []
 
     ds_of = defaultdict(list)
     for e in read_csv(inv / "edges_datasource_table.csv"):
@@ -115,7 +119,7 @@ def main():
             twb_cache[luid] = p.read_text(encoding="utf-8", errors="replace") if p.exists() else None
         return twb_cache[luid]
 
-    rows, classes = [], Counter()
+    rows = []
     for t in pick:
         edges = ds_of.get(t["table_key"]) or [{}]
         for e in edges:
@@ -138,15 +142,12 @@ def main():
                     twb_conns += c
                     init_sql += i
             cls = sorted({c["class"] for c in twb_conns if c["class"]})
-            for c in cls or (["(published datasource: see rest_types)"] if via_published
-                             else ["(not found in the workbook file)"]):
-                classes[c] += 1
             names = [wb_info.get(w, ("", "", ""))[0] for w in wb_luids]
 
             def j(vals):
                 return "; ".join(sorted({v for v in vals if v}))
             rows.append({
-                "table_key": t["table_key"], "schema": t["schema"], "table": t["table"],
+                "site": out.name, "table_key": t["table_key"], "schema": t["schema"], "table": t["table"],
                 "found_via": e.get("via", ""), "datasource": ds_name, "datasource_kind": kind,
                 "rest_types": j(c.get("type") for c in rest), "rest_servers": j(c.get("server_address") for c in rest),
                 "twb_classes": "; ".join(cls), "twb_servers": j(c["server"] for c in twb_conns),
@@ -157,11 +158,37 @@ def main():
                 "owners": j(wb_info.get(w, ("", "", ""))[2] for w in wb_luids),
                 "workbook_luids": "; ".join(wb_luids[:10]),
             })
-    dest = inv / "table-diagnosis.csv"
-    with open(dest, "w", newline="", encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=list(rows[0]), lineterminator="\n")
-        w.writeheader()
-        w.writerows(rows)
+    write_rows(inv / "table-diagnosis.csv", rows)
+    return rows
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    add_site_args(ap)
+    ap.add_argument("--all-sites", action="store_true",
+                    help="every site folder under output/; also writes output/_server/table-diagnosis-all-sites.csv")
+    ap.add_argument("--schema", help="every table in this schema (case-insensitive)")
+    ap.add_argument("--table", help="tables whose key contains this text (case-insensitive)")
+    args = ap.parse_args()
+    if args.all_sites:
+        root = Path(args.out).parent if args.out else REPO_ROOT / "output"
+        rows = []
+        for inv in sorted(root.glob("*/report-inventory")):
+            if not inv.parent.name.startswith("_"):
+                rows += diagnose_site(inv.parent, args)
+        if rows:
+            (root / "_server").mkdir(parents=True, exist_ok=True)
+            dest = root / "_server" / "table-diagnosis-all-sites.csv"
+            write_rows(dest, rows)
+    else:
+        site, out = resolve_site_args(args)
+        rows = diagnose_site(out, args)
+        dest = out / "report-inventory" / "table-diagnosis.csv"
+    if not rows:
+        return
+    classes = Counter(c for r in rows for c in (r["twb_classes"].split("; ") if r["twb_classes"] else
+                      ["(published datasource: see rest_types)"] if r["datasource_kind"] in ("published", "embedded-proxy")
+                      else ["(not found in the workbook file)"]))
     via = Counter((r["found_via"] or "no datasource edge").split(":")[-1] if r["found_via"].startswith("custom_sql")
                   else (r["found_via"] or "no datasource edge") for r in rows)
     log("Found via: " + ", ".join(f"{k} {n}" for k, n in via.most_common()))

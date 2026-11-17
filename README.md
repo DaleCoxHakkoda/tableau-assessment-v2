@@ -393,14 +393,39 @@ datasources (extract with no connection info, proxy to an unresolved published d
 the Parameters pseudo-datasource, dashboards with no member sheets, and so on), prints
 counts with examples, and writes `report-inventory/lineage-diagnosis.csv`.
 
+### Owners across sites: `user_rollup.csv`
+
+Step 10 also writes `output/_server/user_rollup.csv`: one row per workbook owner and site,
+from every site's `reports.csv`, for mapping owners to reporting lines and running the
+owner conversations.
+
+| Column | Meaning |
+|---|---|
+| `owner` | Workbook owner's email (the Tableau username when the account has no email). Matched case-insensitively. `(unknown)` when Tableau returned no owner. |
+| `site` | Site the workbooks are on. |
+| `workbook_count`, `report_count` | Workbooks they own on that site, and the reports (dashboards and standalone sheets) in them. |
+| `owner_username` | Tableau username, for matching to the directory when emails differ. |
+| `reports_in_use`, `retire_candidate_reports` | Information for the conversations, not filters: every workbook stays in the population. |
+| `projects` | Projects their workbooks sit in. |
+| `site_access` | `FULL` or `PARTIAL`: on a partial site only the workbooks the PAT owner can see are counted. |
+
+`reports.csv` also gains an `owner_username` column.
+
 ### Tables across sites, and the migration master list
 
-Step 10 also writes `output/_server/tables-all-sites.csv`: one row per distinct schema +
-table across every site's `tables.csv` (names compared without quotes or brackets, upper
-case; the database is not part of the key because it is often blank). Each row lists the
-sites, databases, connection types and hosts it was seen with, and usage. Usage adds up
-per site and per table, so a workbook reading five tables counts toward all five: rank by
-it, do not total it.
+Step 10 also writes two lists of the tables used across every site's `tables.csv` (names
+compared without quotes or brackets, upper case; the database is not part of the key
+because it is often blank):
+
+| File | One row per | Use |
+|---|---|---|
+| `output/_server/tables-all-sites.csv` | host + schema + table | Counting and comparing. `n_hosts_for_name` of 2 or more flags the same schema + table on other hosts: a possible duplicate to investigate, kept as separate rows so counts are not merged. |
+| `output/_server/tables-all-sites-grouped-hosts.csv` | schema + table | Spotting names that appear on several hosts (`hosts`, `n_hosts`). |
+
+A blank host is its own group and is not counted as another host: it is unknown, not
+different. Both list databases, connection types, sites and usage. Usage adds up per site
+and per table, so a workbook reading five tables counts toward all five: rank by it, do
+not total it.
 
 To check which of those tables are already migrated, compare it with the master list
 (a CSV; save an Excel sheet as CSV first):
@@ -408,20 +433,23 @@ To check which of those tables are already migrated, compare it with the master 
 ```bash
 python scripts/compare_tables.py --master greenplum_master.csv \
     --schema-col SRC_SCHEMA --table-col SRC_TABLE --status-col MIGRATED --target-col SNOWFLAKE_TABLE \
-    [--only-schemas EDW,STAGE]
+    [--only-schemas EDW,STAGE] [--hosts 'gp01,gp02,""']
 ```
 
 Common column names are found without the `--…-col` options. Each table gets a `match`:
 `schema+table`; `table only (N)` when the name appears in the master list under N other
 schemas (typical for unqualified names in custom SQL; an engineer confirms which); or
 `none`. The master list's status and target columns are copied as they are. Writes
-`output/_server/tables-vs-master.csv`, busiest tables first: the worklist for "migrated:
-map source to target" versus "not migrated: build the pipeline". `--only-schemas` keeps
-tables from other platforms out of the `none` count.
+`output/_server/tables-vs-master.csv` (from the per-host list, so each row shows its host),
+busiest tables first: the worklist for "migrated:
+map source to target" versus "not migrated: build the pipeline". `--only-schemas` and `--hosts`
+keep tables from other platforms out of the `none` count (`""` in `--hosts` keeps tables
+whose host is unknown).
 
 To see why tables in `tables.csv` have no `connection_type`, `host` or `database`, run
 `python scripts/diagnose_tables.py --site <site>` (or `--schema EDW`, `--table CLAIMS` to
-pick tables another way). All three come from the database object the Metadata API links a
+pick tables another way; `--all-sites` instead of `--site` covers every site folder and also
+writes `output/_server/table-diagnosis-all-sites.csv` with a `site` column). All three come from the database object the Metadata API links a
 table to, so all three are blank when that link is missing. For each table it traces the
 datasources and workbooks that use it and shows, side by side, the REST connection from
 step 03b (type, server) and the workbook file's own connection from step 04 (class, server,

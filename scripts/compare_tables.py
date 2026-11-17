@@ -6,7 +6,7 @@ Usage:
     python scripts/compare_tables.py --master gp.csv --schema-col SRC_SCHEMA --table-col SRC_TABLE \\
                                      --status-col STATUS --target-col SNOWFLAKE_TABLE [--only-schemas EDW,STAGE]
 
-Reads output/_server/tables-all-sites.csv (written by step 10: one row per distinct schema +
+Reads output/_server/tables-all-sites.csv (written by step 10: one row per host + schema +
 table across every site) and the master list (a CSV; save an Excel sheet as CSV first).
 Names are compared without quotes or brackets, trimmed and upper-cased. No Tableau calls.
 
@@ -19,6 +19,8 @@ Each Tableau table gets a match:
 plus the master list's own status and target columns when given, copied as they are.
 
 Writes output/_server/tables-vs-master.csv, ordered by usage, and prints the counts.
+--hosts limits it to tables on those database hosts (for example the Greenplum servers;
+add "" to keep tables whose host is unknown).
 --only-schemas limits the comparison to the schemas that belong to the master list's
 platform (for example the Greenplum schemas), so tables from other platforms do not show
 up as "none".
@@ -66,6 +68,8 @@ def main():
     ap.add_argument("--status-col", help="master list column copied as master_status (e.g. migrated Y/N)")
     ap.add_argument("--target-col", help="master list column copied as master_target (e.g. the Snowflake table)")
     ap.add_argument("--only-schemas", default="", help="comma-separated schemas to compare (default: all)")
+    ap.add_argument("--hosts", default=None,
+                    help='comma-separated hosts to compare (default: all); include "" for unknown hosts')
     ap.add_argument("--output-dir", default=str(REPO_ROOT / "output"))
     args = ap.parse_args()
 
@@ -98,6 +102,11 @@ def main():
         used = [u for u in used if norm(u["schema"]) in only or not u["schema"]]
         log(f"Comparing schemas {', '.join(sorted(only))} (plus tables with no schema): {len(used)} tables")
 
+    if args.hosts is not None:
+        hosts = {h.strip().strip('"').lower() for h in args.hosts.split(",")}
+        used = [u for u in used if (u.get("host") or "").lower() in hosts]
+        log(f"Comparing hosts {', '.join(sorted(h or '(unknown)' for h in hosts))}: {len(used)} tables")
+
     out, counts = [], Counter()
     for u in used:
         key = (norm(u["schema"]), norm(u["table"]))
@@ -111,13 +120,15 @@ def main():
         else:
             match, cands = "none", ""
         counts[match.split(" (")[0]] += 1
-        row = {"schema": u["schema"], "table": u["table"], "match": match, "master_schemas": cands}
+        row = {"host": u.get("host", ""), "schema": u["schema"], "table": u["table"], "match": match,
+               "master_schemas": cands}
         if args.status_col:
             row["master_status"] = (m or {}).get(args.status_col, "")
         if args.target_col:
             row["master_target"] = (m or {}).get(args.target_col, "")
-        row.update({k: u[k] for k in ("n_sites", "n_workbooks", "n_reports", "sum_wb_accesses", "connection_types",
-                                      "hosts", "databases", "sites", "only_on_partial_sites", "table_keys")})
+        row.update({k: u.get(k, "") for k in ("n_hosts_for_name", "n_sites", "n_workbooks", "n_reports",
+                                              "sum_wb_accesses", "connection_types", "databases",
+                                              "only_on_partial_sites", "table_keys", "sites")})
         out.append(row)
 
     dest = server / "tables-vs-master.csv"
